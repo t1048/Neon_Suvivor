@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Neon Survivor - Blade Update</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="./css/Neon_Suvivor.css">
+</head>
+
+<body>
+
+    <div id="ui" style="display:none;">
+        <div class="stat-box" id="scoreBox">
+            <div class="stat-label">Score</div>
+            <div class="stat-value" id="scoreDisplay">0</div>
+        </div>
+        <div class="stat-box" id="waveBox" style="border-left-color: #ffaa00;">
+            <div class="stat-label">Wave <span id="waveNum">1</span></div>
+            <div class="stat-value" id="timeDisplay">00:00</div>
+        </div>
+        <div class="stat-box" id="hpBox" style="border-left-color: #ff4444;">
+            <div class="stat-label">HP <span id="hpText">100/100</span></div>
+            <div class="hp-bar-bg">
+                <div class="hp-bar-fill" id="hpBar"></div>
+            </div>
+        </div>
+        <div class="stat-box" id="lvlBox" style="border-left-color: #00ff00;">
+            <div class="stat-label">Level <span id="levelText">1</span></div>
+            <div class="exp-bar-bg">
+                <div class="exp-bar-fill" id="expBar"></div>
+            </div>
+        </div>
+        <div class="stat-box" id="wepBox" style="border-left-color: #ffffff;">
+            <div class="stat-label">Weapons (Max 3)</div>
+            <div class="stat-value" id="weaponDisplay" style="font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <div id="bossWarning">WARNING: BOSS DETECTED</div>
+    <div id="systemError">WEAPON SYSTEM ERROR</div>
+
+    <div id="overlay">
+        <div class="title">NEON SURVIVOR</div>
+        <div class="subtitle">WASD to Move | Boss Every 5 Waves</div>
+        <button class="btn" id="startBtn">SYSTEM START</button>
+    </div>
+
+    <div class="audio-controls" id="audioControls" style="display:none;">
+        <label for="volumeSlider">VOLUME <span id="volumeValue">30%</span></label>
+        <input type="range" id="volumeSlider" min="0" max="100" value="30" step="1">
+    </div>
+
+    <button class="mute-btn" id="muteBtn" style="display:none;">🔊 MUTE</button>
+    <canvas id="gameCanvas"></canvas>
+
+    <script src="./js/data.js"></script>
+    <script src="./js/audio.js"></script>
+    <script src="./js/entities.js"></script>
+    <script src="./js/bosses.js"></script>
+    <script src="./js/Neon_Suvivor.js"></script>
+</body>
+
+</html>
