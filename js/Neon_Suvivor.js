@@ -474,7 +474,15 @@ function animate() {
 
         const spawnInterval = Math.max(10, spawnRate - wave * 2);
         const bossSpawnModifier = isBossActive ? 1.43 : 1;
-        if (frameCount % Math.floor(spawnInterval * bossSpawnModifier) === 0) enemies.push(new Enemy());
+        if (frameCount % Math.floor(spawnInterval * bossSpawnModifier) === 0) {
+            let enemiesToSpawn = 1;
+            if (wave > 30) {
+                enemiesToSpawn += Math.floor((wave - 30) / 4);
+            }
+            for (let i = 0; i < enemiesToSpawn; i++) {
+                enemies.push(new Enemy());
+            }
+        }
 
         if (frameCount % 60 === 0) {
             timeSeconds++;
