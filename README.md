@@ -2,14 +2,16 @@
 
 スタイリッシュなネオン世界で、迫りくる敵をかき分けて生き残るトップダウン・サバイバルゲーム。
 
-本作は **1つの HTML ファイル（index.html）だけで動作**する、  
+本作は **HTML ファイル（index.html）をクリックするだけで動作**する、  
 シンプルかつ中毒性の高いサバイバル・ローグライクです。
 
 ---
 
 ## 🎮 公開ページ  
-ゲームはここからブラウザで遊べます：  
+~~ゲームはここからブラウザで遊べます：~~
 ➡ **https://t1048.github.io/Neon_Suvivor/**
+
+今は遊べない状態です
 
 ---
 
@@ -20,6 +22,7 @@
 
 - **Plasma Gun**（自動射撃）  
 - **Scatter Shot**（ショットガン）  
+- **Nano Whip**（両側斬撃）  
 - **Photon Blade**（周囲を回るプラズマ刃）  
 - **Void Field**（継続ダメージフィールド）  
 - **Railgun**（直線貫通レーザー）  
@@ -29,8 +32,10 @@
 
 ---
 
-### 🌀 “Photon Blade” の爽快さがクセになる
-高速回転する刃が敵を切り裂き、画面を豪華に彩ります。
+### 🎵 武器とBGMの相乗効果が気持ちいい
+複数の武器を組み合わせることで、自分だけのビルドが完成。  
+そのビルドに合わせて変化する **動的BGM** とシンクロすることで、  
+プレイヤーは没入感溢れるサウンドスケープを体験できます。
 
 ---
 
@@ -42,12 +47,12 @@ Runner / Tank / Triangle / Square / Hexagon など
 
 ### 🧿 5ウェーブごとに登場する強力ボス
 
-- **Destroyer**  
-- **Charger**  
-- **Sniper**  
-- **Phantom**  
-- **Summoner**  
-- **Juggernaut**
+- **Destroyer**（通常型ボス）  
+- **Charger**（突進型）  
+- **Sniper**（遠距離射撃型）  
+- **Phantom**（テレポート型）  
+- **Summoner**（雑魚召喚型）  
+- **Tank**（装甲重戦車型）
 
 それぞれ個別の攻撃パターンを持つため、小規模ボスラッシュのような緊張感が楽しめます。
 
@@ -60,7 +65,15 @@ Runner / Tank / Triangle / Square / Hexagon など
 
 ## 🖥️ ファイル構成
 ```
-index.html
+index.html                    # メインHTMLファイル
+css/
+  └── Neon_Suvivor.css        # スタイルシート
+js/
+  ├── Neon_Suvivor.js         # メインゲームロジック
+  ├── data.js                 # 武器・敵・アップグレードデータ
+  ├── bosses.js               # ボスクラス定義
+  ├── entities.js             # 敵・プレイヤークラス
+  └── audio.js                # Web Audio APIサウンド管理
 ```
 
 ---
