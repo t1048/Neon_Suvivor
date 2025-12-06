@@ -60,6 +60,11 @@ const keys = {};
 window.addEventListener('keydown', (e) => keys[e.key] = true);
 window.addEventListener('keyup', (e) => keys[e.key] = false);
 
+// Prevent stuck keys when window loses focus
+window.addEventListener('blur', () => {
+    Object.keys(keys).forEach(key => keys[key] = false);
+});
+
 canvas.addEventListener('mousedown', (e) => {
     if (gameState === "gameover") {
         resetGame();

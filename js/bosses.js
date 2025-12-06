@@ -346,10 +346,10 @@ class BossTeleporter extends BossBase {
                 this.alpha = (this.teleportPhase - 15) / 15;
             } else {
                 this.isTeleporting = false;
-                this.teleportCooldown = 150;
+                this.teleportCooldown = 200;
                 this.alpha = 1;
-                for (let i = 0; i < 8; i++) {
-                    const angle = (i / 8) * Math.PI * 2;
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i / 4) * Math.PI * 2;
                     bossBullets.push(new Bullet(this.x, this.y, this.x + Math.cos(angle) * 100, this.y + Math.sin(angle) * 100, true));
                 }
                 soundManager.playShoot();
