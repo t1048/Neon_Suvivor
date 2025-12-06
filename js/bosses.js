@@ -346,7 +346,7 @@ class BossTeleporter extends BossBase {
                 this.alpha = (this.teleportPhase - 15) / 15;
             } else {
                 this.isTeleporting = false;
-                this.teleportCooldown = 90;
+                this.teleportCooldown = 150;
                 this.alpha = 1;
                 for (let i = 0; i < 8; i++) {
                     const angle = (i / 8) * Math.PI * 2;

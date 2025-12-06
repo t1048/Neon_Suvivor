@@ -10,7 +10,7 @@ const weaponsInitial = {
     scatter: { name: 'Scatter Shot', color: '#ffaa00', description: 'Close-range spread fire.', attackPower: 9, range: 180, cooldown: 55, count: 5, spread: 0.6 },
     whip: { name: 'Nano Whip', color: '#ff00ff', description: 'Slashes BOTH sides.', attackPower: 45, range: 180, cooldown: 65 },
     blade: { name: 'Photon Blade', color: '#00ffaa', description: 'Orbiting plasma blade.', attackPower: 25, range: 100, cooldown: 0, count: 1, rotSpeed: 0.08 },
-    sanctuary: { name: 'Void Field', color: '#00ffff', description: 'Damages enemies in aura.', attackPower: 1.5, range: 110, cooldown: 10 },
+    sanctuary: { name: 'Void Field', color: '#00ffff', description: 'Damages enemies in aura.', attackPower: 1.5, range: 110, cooldown: 20 },
     laser: { name: 'Railgun', color: '#ff0000', description: 'Pierces all enemies in line.', attackPower: 20, range: 480, cooldown: 60 },
     bomb: { name: 'Plasma Grenade', color: '#ff8800', description: 'Throws an explosive bomb.', attackPower: 40, range: 250, cooldown: 110, explosionRadius: 100 },
     thunder: { name: 'Tesla Coil', color: '#ffff88', description: 'Chains lightning to enemies.', attackPower: 22, range: 360, cooldown: 80, chainCount: 4 },

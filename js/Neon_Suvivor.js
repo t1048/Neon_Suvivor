@@ -77,11 +77,56 @@ canvas.addEventListener('mousedown', (e) => {
         for (let i = 0; i < upgradeOptions.length; i++) {
             const x = startX + i * (boxWidth + gap);
             if (clickX >= x && clickX <= x + boxWidth && clickY >= startY && clickY <= startY + boxHeight) {
+                selectedUpgradeIndex = i;
                 upgradeOptions[i].apply();
                 soundManager.playLevelUp();
                 gameState = "playing";
                 break;
             }
+        }
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (gameState === "levelup") {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const boxWidth = 220, boxHeight = 280, gap = 20;
+        const startX = (canvas.width - ((boxWidth * 3) + (gap * 2))) / 2;
+        const startY = (canvas.height - boxHeight) / 2;
+
+        hoveredUpgradeIndex = -1;
+        for (let i = 0; i < upgradeOptions.length; i++) {
+            const x = startX + i * (boxWidth + gap);
+            if (mouseX >= x && mouseX <= x + boxWidth && mouseY >= startY && mouseY <= startY + boxHeight) {
+                hoveredUpgradeIndex = i;
+                break;
+            }
+        }
+    } else {
+        hoveredUpgradeIndex = -1;
+    }
+});
+
+canvas.addEventListener('mouseleave', (e) => {
+    hoveredUpgradeIndex = -1;
+});
+
+window.addEventListener('keydown', (e) => {
+    if (gameState === "levelup") {
+        if (e.key.toLowerCase() === 'a') {
+            selectedUpgradeIndex = (selectedUpgradeIndex - 1 + upgradeOptions.length) % upgradeOptions.length;
+            e.preventDefault();
+        } else if (e.key.toLowerCase() === 'd') {
+            selectedUpgradeIndex = (selectedUpgradeIndex + 1) % upgradeOptions.length;
+            e.preventDefault();
+        } else if (e.key === ' ') {
+            upgradeOptions[selectedUpgradeIndex].apply();
+            soundManager.playLevelUp();
+            gameState = "playing";
+            selectedUpgradeIndex = 0;
+            e.preventDefault();
         }
     }
 });
@@ -108,6 +153,8 @@ let enemies = [], bullets = [], particles = [], gems = [], weaponItems = [], upg
 let laserBeams = [], bombs = [], thunders = [], whips = [], sanctuaryParticles = [], mines = [];
 let bossBullets = [];
 let rotatingBlades = [];
+let selectedUpgradeIndex = 0;
+let hoveredUpgradeIndex = -1;
 
 let enemyBaseHp = 10;
 let spawnRate = 60;
@@ -335,6 +382,9 @@ function updatePlayer() {
                 enemies.forEach(e => {
                     if (Math.hypot(e.x - player.x, e.y - player.y) < w.range + e.size) {
                         e.takeDamage(w.attackPower * dmgMult);
+                        const a = Math.atan2(e.y - player.y, e.x - player.x);
+                        e.pushX = Math.cos(a) * 6;
+                        e.pushY = Math.sin(a) * 6;
                     }
                 });
                 player.weaponCooldowns[key] = w.cooldown;
@@ -658,6 +708,10 @@ function animate() {
             const grad = ctx.createLinearGradient(x, y, x, y + boxHeight);
             grad.addColorStop(0, '#222'); grad.addColorStop(1, '#111');
             ctx.fillStyle = grad; ctx.fillRect(x, y, boxWidth, boxHeight);
+            
+            if (i === selectedUpgradeIndex || i === hoveredUpgradeIndex) {
+                ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 4; ctx.strokeRect(x - 2, y - 2, boxWidth + 4, boxHeight + 4);
+            }
             ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, boxWidth, boxHeight);
 
             ctx.fillStyle = '#00aaff'; ctx.font = 'bold 18px Arial'; ctx.fillText(opt.name, x + boxWidth / 2, y + 40);
