@@ -25,6 +25,18 @@ const initialVolume = Math.round(soundManager.masterVolume * 100);
 volumeSlider.value = initialVolume;
 volumeValue.innerText = `${initialVolume}%`;
 
+// Touch Controls - Define early for use in event listeners
+const touchControls = document.getElementById('touchControls');
+const joystickZone = document.getElementById('joystickZone');
+const joystickStick = document.getElementById('joystickStick');
+
+// Detect if device supports touch
+const isTouchDevice = () => {
+    return (('ontouchstart' in window) ||
+        (navigator.maxTouchPoints > 0) ||
+        (navigator.msMaxTouchPoints > 0));
+};
+
 startBtn.addEventListener('click', () => {
     soundManager.init();
     soundManager.startBGM();
@@ -69,23 +81,13 @@ window.addEventListener('blur', () => {
     Object.keys(keys).forEach(key => keys[key] = false);
 });
 
-// Touch Controls
-const touchControls = document.getElementById('touchControls');
-const joystickZone = document.getElementById('joystickZone');
-const joystickStick = document.getElementById('joystickStick');
-
+// Touch Controls State
+const JOYSTICK_CENTER_OFFSET = 35; // Center offset for joystick stick positioning
 let touchActive = false;
 let touchDx = 0;
 let touchDy = 0;
 let touchStartX = 0;
 let touchStartY = 0;
-
-// Detect if device supports touch
-const isTouchDevice = () => {
-    return (('ontouchstart' in window) ||
-        (navigator.maxTouchPoints > 0) ||
-        (navigator.msMaxTouchPoints > 0));
-};
 
 // Show touch controls on touch devices
 if (isTouchDevice()) {
@@ -110,18 +112,17 @@ function handleJoystickMove(e) {
     const deltaY = touch.clientY - touchStartY;
     
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    const maxDistance = 35; // Max distance from center
     
     if (distance > 0) {
         const angle = Math.atan2(deltaY, deltaX);
-        const limitedDistance = Math.min(distance, maxDistance);
+        const limitedDistance = Math.min(distance, JOYSTICK_CENTER_OFFSET);
         
-        touchDx = Math.cos(angle) * (limitedDistance / maxDistance);
-        touchDy = Math.sin(angle) * (limitedDistance / maxDistance);
+        touchDx = Math.cos(angle) * (limitedDistance / JOYSTICK_CENTER_OFFSET);
+        touchDy = Math.sin(angle) * (limitedDistance / JOYSTICK_CENTER_OFFSET);
         
         // Update joystick visual position
-        const stickX = 35 + (touchDx * maxDistance);
-        const stickY = 35 + (touchDy * maxDistance);
+        const stickX = JOYSTICK_CENTER_OFFSET + (touchDx * JOYSTICK_CENTER_OFFSET);
+        const stickY = JOYSTICK_CENTER_OFFSET + (touchDy * JOYSTICK_CENTER_OFFSET);
         joystickStick.style.left = stickX + 'px';
         joystickStick.style.top = stickY + 'px';
     }
@@ -133,8 +134,8 @@ function handleJoystickEnd(e) {
     touchDy = 0;
     
     // Reset joystick to center
-    joystickStick.style.left = '35px';
-    joystickStick.style.top = '35px';
+    joystickStick.style.left = JOYSTICK_CENTER_OFFSET + 'px';
+    joystickStick.style.top = JOYSTICK_CENTER_OFFSET + 'px';
 }
 
 // Add touch event listeners
