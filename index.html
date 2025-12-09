@@ -46,12 +46,16 @@
         <button class="btn" id="startBtn">SYSTEM START</button>
     </div>
 
-    <div class="audio-controls" id="audioControls" style="display:none;">
-        <label for="volumeSlider">VOLUME <span id="volumeValue">30%</span></label>
-        <input type="range" id="volumeSlider" min="0" max="100" value="30" step="1">
+    <div class="audio-container" id="audioContainer" style="display:none;">
+        <button class="audio-toggle" id="audioToggle" aria-expanded="false">🔊</button>
+        <div class="audio-panel" id="audioPanel" aria-hidden="true">
+            <button class="mute-btn" id="muteBtn">🔊 MUTE</button>
+            <div class="audio-controls" id="audioControls">
+                <label for="volumeSlider">VOLUME <span id="volumeValue">30%</span></label>
+                <input type="range" id="volumeSlider" min="0" max="100" value="30" step="1">
+            </div>
+        </div>
     </div>
-
-    <button class="mute-btn" id="muteBtn" style="display:none;">🔊 MUTE</button>
 
     <!-- Touch Controls for Mobile -->
     <div id="touchControls" style="display:none;">

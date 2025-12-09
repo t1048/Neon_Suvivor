@@ -36,6 +36,9 @@ const overlay = document.getElementById('overlay');
 const ui = document.getElementById('ui');
 const muteBtn = document.getElementById('muteBtn');
 const bossWarning = document.getElementById('bossWarning');
+const audioContainer = document.getElementById('audioContainer');
+const audioToggle = document.getElementById('audioToggle');
+const audioPanel = document.getElementById('audioPanel');
 const audioControls = document.getElementById('audioControls');
 const volumeSlider = document.getElementById('volumeSlider');
 const volumeValue = document.getElementById('volumeValue');
@@ -62,8 +65,8 @@ startBtn.addEventListener('click', () => {
     soundManager.startBGM();
     overlay.style.display = 'none';
     ui.style.display = 'flex';
-    muteBtn.style.display = 'block';
-    audioControls.style.display = 'block';
+    audioContainer.style.display = 'block';
+    setAudioPanel(false);
     if (isTouchDevice()) {
         touchControls.style.display = 'block';
     }
@@ -75,12 +78,33 @@ startBtn.addEventListener('click', () => {
 muteBtn.addEventListener('click', () => {
     const muted = soundManager.toggleMute();
     muteBtn.innerText = muted ? "🔇 MUTED" : "🔊 MUTE";
+    audioToggle.innerText = muted ? "🔇" : "🔊";
 });
 
 volumeSlider.addEventListener('input', () => {
     const vol = volumeSlider.value / 100;
     soundManager.setVolume(vol);
     volumeValue.innerText = `${volumeSlider.value}%`;
+});
+
+let isAudioPanelOpen = false;
+
+function setAudioPanel(open) {
+    isAudioPanelOpen = open;
+    audioContainer.classList.toggle('open', open);
+    audioToggle.setAttribute('aria-expanded', open);
+    audioPanel.setAttribute('aria-hidden', !open);
+}
+
+audioToggle.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setAudioPanel(!isAudioPanelOpen);
+});
+
+document.addEventListener('click', (event) => {
+    if (!isAudioPanelOpen) return;
+    if (audioContainer.contains(event.target)) return;
+    setAudioPanel(false);
 });
 
 let gameState = "start";
