@@ -359,3 +359,25 @@ canvas {
         display: none !important;
     }
 }
+
+/* Mobile landscape optimizations */
+@media (max-height: 600px) and (orientation: landscape) {
+    #ui {
+        transform: scale(0.75);
+        transform-origin: top left;
+        top: 0.5rem;
+        left: 0.5rem;
+    }
+    
+    .stat-box {
+        padding: 0.3rem 0.5rem;
+    }
+    
+    .stat-label {
+        font-size: 0.45rem;
+    }
+    
+    .stat-value {
+        font-size: 0.75rem;
+    }
+}
