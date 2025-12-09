@@ -42,7 +42,7 @@
 
     <div id="overlay">
         <div class="title">NEON SURVIVOR</div>
-        <div class="subtitle">WASD to Move | Boss Every 5 Waves</div>
+        <div class="subtitle" id="gameSubtitle">WASD to Move | Boss Every 5 Waves</div>
         <button class="btn" id="startBtn">SYSTEM START</button>
     </div>
 
@@ -52,6 +52,15 @@
     </div>
 
     <button class="mute-btn" id="muteBtn" style="display:none;">🔊 MUTE</button>
+
+    <!-- Touch Controls for Mobile -->
+    <div id="touchControls" style="display:none;">
+        <div id="joystickZone">
+            <div id="joystickBase"></div>
+            <div id="joystickStick"></div>
+        </div>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
     <script src="./js/data.js"></script>
