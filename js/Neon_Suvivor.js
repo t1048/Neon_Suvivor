@@ -19,6 +19,7 @@ const bossWarning = document.getElementById('bossWarning');
 const audioControls = document.getElementById('audioControls');
 const volumeSlider = document.getElementById('volumeSlider');
 const volumeValue = document.getElementById('volumeValue');
+const gameSubtitle = document.getElementById('gameSubtitle');
 
 const initialVolume = Math.round(soundManager.masterVolume * 100);
 volumeSlider.value = initialVolume;
@@ -31,6 +32,9 @@ startBtn.addEventListener('click', () => {
     ui.style.display = 'flex';
     muteBtn.style.display = 'block';
     audioControls.style.display = 'block';
+    if (isTouchDevice()) {
+        touchControls.style.display = 'block';
+    }
     gameState = "playing";
     resetGame();
     animate();
@@ -64,6 +68,86 @@ window.addEventListener('keyup', (e) => keys[e.key] = false);
 window.addEventListener('blur', () => {
     Object.keys(keys).forEach(key => keys[key] = false);
 });
+
+// Touch Controls
+const touchControls = document.getElementById('touchControls');
+const joystickZone = document.getElementById('joystickZone');
+const joystickStick = document.getElementById('joystickStick');
+
+let touchActive = false;
+let touchDx = 0;
+let touchDy = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+
+// Detect if device supports touch
+const isTouchDevice = () => {
+    return (('ontouchstart' in window) ||
+        (navigator.maxTouchPoints > 0) ||
+        (navigator.msMaxTouchPoints > 0));
+};
+
+// Show touch controls on touch devices
+if (isTouchDevice()) {
+    touchControls.style.display = 'block';
+    gameSubtitle.textContent = 'Use Joystick to Move | Boss Every 5 Waves';
+}
+
+function handleJoystickStart(e) {
+    touchActive = true;
+    const rect = joystickZone.getBoundingClientRect();
+    touchStartX = rect.left + rect.width / 2;
+    touchStartY = rect.top + rect.height / 2;
+}
+
+function handleJoystickMove(e) {
+    if (!touchActive) return;
+    
+    e.preventDefault();
+    const touch = e.touches ? e.touches[0] : e;
+    
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+    
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const maxDistance = 35; // Max distance from center
+    
+    if (distance > 0) {
+        const angle = Math.atan2(deltaY, deltaX);
+        const limitedDistance = Math.min(distance, maxDistance);
+        
+        touchDx = Math.cos(angle) * (limitedDistance / maxDistance);
+        touchDy = Math.sin(angle) * (limitedDistance / maxDistance);
+        
+        // Update joystick visual position
+        const stickX = 35 + (touchDx * maxDistance);
+        const stickY = 35 + (touchDy * maxDistance);
+        joystickStick.style.left = stickX + 'px';
+        joystickStick.style.top = stickY + 'px';
+    }
+}
+
+function handleJoystickEnd(e) {
+    touchActive = false;
+    touchDx = 0;
+    touchDy = 0;
+    
+    // Reset joystick to center
+    joystickStick.style.left = '35px';
+    joystickStick.style.top = '35px';
+}
+
+// Add touch event listeners
+joystickZone.addEventListener('touchstart', handleJoystickStart, { passive: false });
+joystickZone.addEventListener('touchmove', handleJoystickMove, { passive: false });
+joystickZone.addEventListener('touchend', handleJoystickEnd, { passive: false });
+joystickZone.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
+
+// Also support mouse for testing
+joystickZone.addEventListener('mousedown', handleJoystickStart);
+joystickZone.addEventListener('mousemove', handleJoystickMove);
+joystickZone.addEventListener('mouseup', handleJoystickEnd);
+joystickZone.addEventListener('mouseleave', handleJoystickEnd);
 
 canvas.addEventListener('mousedown', (e) => {
     if (gameState === "gameover") {
@@ -267,8 +351,17 @@ function updatePlayer() {
     if (player.contactDamageCooldown > 0) player.contactDamageCooldown--;
     const cooldownBoost = calcCooldownBoost();
     let dx = 0, dy = 0;
+    
+    // Keyboard input
     if (keys['w'] || keys['ArrowUp']) dy = -1; if (keys['s'] || keys['ArrowDown']) dy = 1;
     if (keys['a'] || keys['ArrowLeft']) dx = -1; if (keys['d'] || keys['ArrowRight']) dx = 1;
+    
+    // Touch input (overrides keyboard if active)
+    if (touchActive) {
+        dx = touchDx;
+        dy = touchDy;
+    }
+    
     if (dx || dy) {
         player.lastMoveAngle = Math.atan2(dy, dx);
         const l = Math.hypot(dx, dy);
