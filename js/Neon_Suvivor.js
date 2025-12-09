@@ -292,20 +292,33 @@ let selectedUpgradeIndex = 0;
 let hoveredUpgradeIndex = -1;
 
 function getUpgradeLayout() {
+    const isPortrait = canvas.width < canvas.height;
     const responsiveScale = Math.min(1, Math.max(0.65, canvas.width / 1200));
-    const boxWidth = 220 * responsiveScale;
-    const boxHeight = 280 * responsiveScale;
-    const gap = 20 * responsiveScale;
+    let boxWidth, boxHeight, gap, columns, rows;
 
-    const columns = Math.max(1, Math.min(3, Math.floor((canvas.width + gap) / (boxWidth + gap))));
-    const rows = Math.max(1, Math.ceil(upgradeOptions.length / columns));
+    if (isPortrait) {
+        // 横画面の場合、カードを横に並べる
+        columns = upgradeOptions.length;
+        rows = 1;
+        gap = 15 * responsiveScale;
+        const totalGap = (columns - 1) * gap;
+        boxWidth = (canvas.width - totalGap - 40) / columns;
+        boxHeight = boxWidth * 1.8; // アスペクト比を調整
+    } else {
+        // 通常のレイアウト
+        boxWidth = 220 * responsiveScale;
+        boxHeight = 280 * responsiveScale;
+        gap = 20 * responsiveScale;
+        columns = Math.max(1, Math.min(3, Math.floor((canvas.width + gap) / (boxWidth + gap))));
+        rows = Math.max(1, Math.ceil(upgradeOptions.length / columns));
+    }
 
     const totalWidth = columns * boxWidth + (columns - 1) * gap;
     const totalHeight = rows * boxHeight + (rows - 1) * gap;
     const startX = (canvas.width - totalWidth) / 2;
     const startY = Math.max(100 * responsiveScale, (canvas.height - totalHeight) / 2);
 
-    return { boxWidth, boxHeight, gap, startX, startY, columns, rows, responsiveScale };
+    return { boxWidth, boxHeight, gap, startX, startY, columns, rows, responsiveScale, isPortrait };
 }
 
 let enemyBaseHp = 10;
@@ -864,10 +877,13 @@ function animate() {
         ctx.restore();
 
         ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        const { boxWidth, boxHeight, gap, startX, startY, columns, responsiveScale } = getUpgradeLayout();
-        const titleFontSize = 40 * responsiveScale;
-        const nameFontSize = 18 * responsiveScale;
-        const bodyFontSize = 14 * responsiveScale;
+        const { boxWidth, boxHeight, gap, startX, startY, columns, responsiveScale, isPortrait } = getUpgradeLayout();
+
+        // Adjust font sizes based on orientation
+        const titleFontSize = (isPortrait ? 32 : 40) * responsiveScale;
+        const nameFontSize = (isPortrait ? 22 : 18) * responsiveScale;
+        const bodyFontSize = (isPortrait ? 18 : 14) * responsiveScale;
+
         ctx.fillStyle = "#fff"; ctx.font = `bold ${titleFontSize}px Arial`; ctx.textAlign = "center";
         ctx.fillText("LEVEL UP", canvas.width / 2, Math.max(60, 100 * responsiveScale));
 
@@ -885,9 +901,13 @@ function animate() {
             }
             ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, boxWidth, boxHeight);
 
-            ctx.fillStyle = '#00aaff'; ctx.font = `bold ${nameFontSize}px Arial`; ctx.fillText(opt.name, x + boxWidth / 2, y + 40 * responsiveScale);
+            ctx.fillStyle = '#00aaff'; ctx.font = `bold ${nameFontSize}px Arial`;
+            ctx.fillText(opt.name, x + boxWidth / 2, y + (isPortrait ? 30 : 40) * responsiveScale);
+
             ctx.fillStyle = '#ccc'; ctx.font = `${bodyFontSize}px Arial`;
-            wrapText(ctx, opt.description, x + boxWidth / 2, y + 100 * responsiveScale, boxWidth - 20, 20 * responsiveScale);
+            const textY = y + (isPortrait ? 70 : 100) * responsiveScale;
+            const lineHeight = (isPortrait ? 22 : 20) * responsiveScale;
+            wrapText(ctx, opt.description, x + boxWidth / 2, textY, boxWidth - (isPortrait ? 15 : 20), lineHeight);
         });
     } else if (gameState === "gameover") {
         ctx.fillStyle = "rgba(10, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
