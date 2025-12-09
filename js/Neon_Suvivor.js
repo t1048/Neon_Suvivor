@@ -69,12 +69,6 @@ startBtn.addEventListener('click', () => {
     setAudioPanel(false);
     if (isTouchDevice()) {
         touchControls.style.display = 'block';
-        // Reset joystick position
-        if (joystickZone && joystickStick) {
-            const radius = joystickZone.offsetWidth / 2;
-            joystickStick.style.left = (radius - joystickStick.offsetWidth / 2) + 'px';
-            joystickStick.style.top = (radius - joystickStick.offsetHeight / 2) + 'px';
-        }
     }
     gameState = "playing";
     resetGame();
@@ -139,32 +133,10 @@ let touchDy = 0;
 let touchStartX = 0;
 let touchStartY = 0;
 
-// Button press states
-const buttonStates = {
-    attack: false,
-    skill: false,
-    dash: false
-};
-
-// Get button elements
-const attackBtn = document.getElementById('attackBtn');
-const skillBtn = document.getElementById('skillBtn');
-const dashBtn = document.getElementById('dashBtn');
-const buttonZone = document.getElementById('buttonZone');
-
 // Show touch controls on touch devices
 if (isTouchDevice()) {
     touchControls.style.display = 'block';
-    gameSubtitle.textContent = 'Joystick to Move | Buttons to Act | Boss Every 5 Waves';
-    
-    // Initialize joystick position on next frame to ensure element dimensions are available
-    requestAnimationFrame(() => {
-        if (joystickZone && joystickStick) {
-            const radius = joystickZone.offsetWidth / 2;
-            joystickStick.style.left = (radius - joystickStick.offsetWidth / 2) + 'px';
-            joystickStick.style.top = (radius - joystickStick.offsetHeight / 2) + 'px';
-        }
-    });
+    gameSubtitle.textContent = 'Use Joystick to Move | Boss Every 5 Waves';
 }
 
 function handleJoystickStart(e) {
@@ -187,17 +159,16 @@ function handleJoystickMove(e) {
     
     if (distance > 0) {
         const angle = Math.atan2(deltaY, deltaX);
-        const radius = joystickZone.offsetWidth / 2;
-        const limitedDistance = Math.min(distance, radius * 0.6);
+        const limitedDistance = Math.min(distance, JOYSTICK_CENTER_OFFSET);
         
-        touchDx = Math.cos(angle) * (limitedDistance / (radius * 0.6));
-        touchDy = Math.sin(angle) * (limitedDistance / (radius * 0.6));
+        touchDx = Math.cos(angle) * (limitedDistance / JOYSTICK_CENTER_OFFSET);
+        touchDy = Math.sin(angle) * (limitedDistance / JOYSTICK_CENTER_OFFSET);
         
         // Update joystick visual position
-        const stickX = radius + (Math.cos(angle) * limitedDistance);
-        const stickY = radius + (Math.sin(angle) * limitedDistance);
-        joystickStick.style.left = (stickX - joystickStick.offsetWidth / 2) + 'px';
-        joystickStick.style.top = (stickY - joystickStick.offsetHeight / 2) + 'px';
+        const stickX = JOYSTICK_CENTER_OFFSET + (touchDx * JOYSTICK_CENTER_OFFSET);
+        const stickY = JOYSTICK_CENTER_OFFSET + (touchDy * JOYSTICK_CENTER_OFFSET);
+        joystickStick.style.left = stickX + 'px';
+        joystickStick.style.top = stickY + 'px';
     }
 }
 
@@ -207,12 +178,11 @@ function handleJoystickEnd(e) {
     touchDy = 0;
     
     // Reset joystick to center
-    const radius = joystickZone.offsetWidth / 2;
-    joystickStick.style.left = (radius - joystickStick.offsetWidth / 2) + 'px';
-    joystickStick.style.top = (radius - joystickStick.offsetHeight / 2) + 'px';
+    joystickStick.style.left = JOYSTICK_CENTER_OFFSET + 'px';
+    joystickStick.style.top = JOYSTICK_CENTER_OFFSET + 'px';
 }
 
-// Add touch event listeners to joystick
+// Add touch event listeners
 joystickZone.addEventListener('touchstart', handleJoystickStart, { passive: false });
 joystickZone.addEventListener('touchmove', handleJoystickMove, { passive: false });
 joystickZone.addEventListener('touchend', handleJoystickEnd, { passive: false });
@@ -223,81 +193,6 @@ joystickZone.addEventListener('mousedown', handleJoystickStart);
 joystickZone.addEventListener('mousemove', handleJoystickMove);
 joystickZone.addEventListener('mouseup', handleJoystickEnd);
 joystickZone.addEventListener('mouseleave', handleJoystickEnd);
-
-// Button event handlers
-function handleButtonDown(buttonName) {
-    buttonStates[buttonName] = true;
-}
-
-function handleButtonUp(buttonName) {
-    buttonStates[buttonName] = false;
-}
-
-// Attack Button (A key)
-if (attackBtn) {
-    attackBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        handleButtonDown('attack');
-        keys['a'] = true;
-    }, { passive: false });
-    attackBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        handleButtonUp('attack');
-        keys['a'] = false;
-    }, { passive: false });
-    attackBtn.addEventListener('mousedown', () => {
-        handleButtonDown('attack');
-        keys['a'] = true;
-    });
-    attackBtn.addEventListener('mouseup', () => {
-        handleButtonUp('attack');
-        keys['a'] = false;
-    });
-}
-
-// Skill Button (S key)
-if (skillBtn) {
-    skillBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        handleButtonDown('skill');
-        keys['s'] = true;
-    }, { passive: false });
-    skillBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        handleButtonUp('skill');
-        keys['s'] = false;
-    }, { passive: false });
-    skillBtn.addEventListener('mousedown', () => {
-        handleButtonDown('skill');
-        keys['s'] = true;
-    });
-    skillBtn.addEventListener('mouseup', () => {
-        handleButtonUp('skill');
-        keys['s'] = false;
-    });
-}
-
-// Dash Button (D key)
-if (dashBtn) {
-    dashBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        handleButtonDown('dash');
-        keys['d'] = true;
-    }, { passive: false });
-    dashBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        handleButtonUp('dash');
-        keys['d'] = false;
-    }, { passive: false });
-    dashBtn.addEventListener('mousedown', () => {
-        handleButtonDown('dash');
-        keys['d'] = true;
-    });
-    dashBtn.addEventListener('mouseup', () => {
-        handleButtonUp('dash');
-        keys['d'] = false;
-    });
-}
 
 canvas.addEventListener('mousedown', (e) => {
     if (gameState === "gameover") {
@@ -326,36 +221,6 @@ canvas.addEventListener('mousedown', (e) => {
         }
     }
 });
-
-// Touch support for canvas (levelup selection)
-canvas.addEventListener('touchend', (e) => {
-    if (gameState === "gameover") {
-        resetGame();
-        gameState = "playing";
-        soundManager.startBGM();
-    }
-    else if (gameState === "levelup") {
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.changedTouches[0];
-        const clickX = touch.clientX - rect.left;
-        const clickY = touch.clientY - rect.top;
-        const { boxWidth, boxHeight, gap, startX, startY, columns } = getUpgradeLayout();
-
-        for (let i = 0; i < upgradeOptions.length; i++) {
-            const col = i % columns;
-            const row = Math.floor(i / columns);
-            const x = startX + col * (boxWidth + gap);
-            const y = startY + row * (boxHeight + gap);
-            if (clickX >= x && clickX <= x + boxWidth && clickY >= y && clickY <= y + boxHeight) {
-                selectedUpgradeIndex = i;
-                upgradeOptions[i].apply();
-                soundManager.playLevelUp();
-                gameState = "playing";
-                break;
-            }
-        }
-    }
-}, { passive: true });
 
 canvas.addEventListener('mousemove', (e) => {
     if (gameState === "levelup") {
