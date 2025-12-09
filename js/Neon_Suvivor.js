@@ -3,11 +3,31 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const soundManager = new SoundManager();
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-window.addEventListener('resize', () => {
+const camera = { x: 0, y: 0, zoom: 1 };
+let viewWidth = canvas.width;
+let viewHeight = canvas.height;
+
+function updateCameraZoom() {
+    camera.zoom = window.innerWidth < 768 ? 0.75 : 0.85;
+    updateViewSize();
+}
+
+function updateCanvasSize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    updateViewSize();
+}
+
+function updateViewSize() {
+    viewWidth = canvas.width / camera.zoom;
+    viewHeight = canvas.height / camera.zoom;
+}
+
+updateCanvasSize();
+updateCameraZoom();
+window.addEventListener('resize', () => {
+    updateCanvasSize();
+    updateCameraZoom();
 });
 
 // UI
@@ -160,13 +180,14 @@ canvas.addEventListener('mousedown', (e) => {
         const rect = canvas.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const clickY = e.clientY - rect.top;
-        const boxWidth = 220, boxHeight = 280, gap = 20;
-        const startX = (canvas.width - ((boxWidth * 3) + (gap * 2))) / 2;
-        const startY = (canvas.height - boxHeight) / 2;
+        const { boxWidth, boxHeight, gap, startX, startY, columns } = getUpgradeLayout();
 
         for (let i = 0; i < upgradeOptions.length; i++) {
-            const x = startX + i * (boxWidth + gap);
-            if (clickX >= x && clickX <= x + boxWidth && clickY >= startY && clickY <= startY + boxHeight) {
+            const col = i % columns;
+            const row = Math.floor(i / columns);
+            const x = startX + col * (boxWidth + gap);
+            const y = startY + row * (boxHeight + gap);
+            if (clickX >= x && clickX <= x + boxWidth && clickY >= y && clickY <= y + boxHeight) {
                 selectedUpgradeIndex = i;
                 upgradeOptions[i].apply();
                 soundManager.playLevelUp();
@@ -182,14 +203,15 @@ canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        const boxWidth = 220, boxHeight = 280, gap = 20;
-        const startX = (canvas.width - ((boxWidth * 3) + (gap * 2))) / 2;
-        const startY = (canvas.height - boxHeight) / 2;
+        const { boxWidth, boxHeight, gap, startX, startY, columns } = getUpgradeLayout();
 
         hoveredUpgradeIndex = -1;
         for (let i = 0; i < upgradeOptions.length; i++) {
-            const x = startX + i * (boxWidth + gap);
-            if (mouseX >= x && mouseX <= x + boxWidth && mouseY >= startY && mouseY <= startY + boxHeight) {
+            const col = i % columns;
+            const row = Math.floor(i / columns);
+            const x = startX + col * (boxWidth + gap);
+            const y = startY + row * (boxHeight + gap);
+            if (mouseX >= x && mouseX <= x + boxWidth && mouseY >= y && mouseY <= y + boxHeight) {
                 hoveredUpgradeIndex = i;
                 break;
             }
@@ -235,9 +257,8 @@ const player = {
     damageReduction: 0 // Fortress Skill
 };
 
-const camera = { x: 0, y: 0 };
 const world = { width: 3000, height: 3000 };
-const isOffscreen = (sx, sy, margin = 100) => sx < -margin || sx > canvas.width + margin || sy < -margin || sy > canvas.height + margin;
+const isOffscreen = (sx, sy, margin = 100) => sx < -margin || sx > viewWidth + margin || sy < -margin || sy > viewHeight + margin;
 
 let enemies = [], bullets = [], particles = [], gems = [], weaponItems = [], upgradeOptions = [], floatingTexts = [];
 let laserBeams = [], bombs = [], thunders = [], whips = [], sanctuaryParticles = [], mines = [];
@@ -245,6 +266,23 @@ let bossBullets = [];
 let rotatingBlades = [];
 let selectedUpgradeIndex = 0;
 let hoveredUpgradeIndex = -1;
+
+function getUpgradeLayout() {
+    const responsiveScale = Math.min(1, Math.max(0.65, canvas.width / 1200));
+    const boxWidth = 220 * responsiveScale;
+    const boxHeight = 280 * responsiveScale;
+    const gap = 20 * responsiveScale;
+
+    const columns = Math.max(1, Math.min(3, Math.floor((canvas.width + gap) / (boxWidth + gap))));
+    const rows = Math.max(1, Math.ceil(upgradeOptions.length / columns));
+
+    const totalWidth = columns * boxWidth + (columns - 1) * gap;
+    const totalHeight = rows * boxHeight + (rows - 1) * gap;
+    const startX = (canvas.width - totalWidth) / 2;
+    const startY = Math.max(100 * responsiveScale, (canvas.height - totalHeight) / 2);
+
+    return { boxWidth, boxHeight, gap, startX, startY, columns, rows, responsiveScale };
+}
 
 let enemyBaseHp = 10;
 let spawnRate = 60;
@@ -370,8 +408,8 @@ function updatePlayer() {
     }
     player.x = clamp(player.x, 0, world.width);
     player.y = clamp(player.y, 0, world.height);
-    camera.x += (player.x - canvas.width / 2 - camera.x) * 0.1;
-    camera.y += (player.y - canvas.height / 2 - camera.y) * 0.1;
+    camera.x += (player.x - viewWidth / 2 - camera.x) * 0.1;
+    camera.y += (player.y - viewHeight / 2 - camera.y) * 0.1;
 
     // Handle Persistent Weapons (Photon Blade)
     if (player.weapons.includes('blade')) {
@@ -609,8 +647,8 @@ function drawGridLines(color) {
     const gridSize = 100;
     const offX = -camera.x % gridSize, offY = -camera.y % gridSize;
     ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
-    for (let x = offX; x < canvas.width; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); }
-    for (let y = offY; y < canvas.height; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); }
+    for (let x = offX; x < viewWidth; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, viewHeight); }
+    for (let y = offY; y < viewHeight; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(viewWidth, y); }
     ctx.stroke();
 }
 
@@ -674,6 +712,9 @@ function animate() {
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
+
+        ctx.save();
+        ctx.scale(camera.zoom, camera.zoom);
 
         drawGridLines(gridColor);
 
@@ -787,35 +828,42 @@ function animate() {
         floatingTexts.forEach((t, i) => { t.update(); t.draw(); if (t.life <= 0) floatingTexts.splice(i, 1); });
         particles.forEach((p, i) => { p.update(); p.draw(); if (p.life <= 0) particles.splice(i, 1); });
 
+        ctx.restore();
+
     } else if (gameState === "levelup") {
+        ctx.save();
+        ctx.scale(camera.zoom, camera.zoom);
         drawGridLines('#333');
         enemies.forEach(e => e.draw());
         rotatingBlades.forEach(b => b.draw(weapons.blade));
         ctx.fillStyle = player.color; ctx.beginPath(); ctx.arc(player.x - camera.x, player.y - camera.y, player.size, 0, 6.28); ctx.fill();
+        ctx.restore();
 
         ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#fff"; ctx.font = "bold 40px Arial"; ctx.textAlign = "center";
-        ctx.fillText("LEVEL UP", canvas.width / 2, 100);
-
-        const boxWidth = 220, boxHeight = 280, gap = 20;
-        const startX = (canvas.width - ((boxWidth * 3) + (gap * 2))) / 2;
-        const startY = (canvas.height - boxHeight) / 2;
+        const { boxWidth, boxHeight, gap, startX, startY, columns, responsiveScale } = getUpgradeLayout();
+        const titleFontSize = 40 * responsiveScale;
+        const nameFontSize = 18 * responsiveScale;
+        const bodyFontSize = 14 * responsiveScale;
+        ctx.fillStyle = "#fff"; ctx.font = `bold ${titleFontSize}px Arial`; ctx.textAlign = "center";
+        ctx.fillText("LEVEL UP", canvas.width / 2, Math.max(60, 100 * responsiveScale));
 
         upgradeOptions.forEach((opt, i) => {
-            const x = startX + i * (boxWidth + gap);
-            const y = startY;
+            const col = i % columns;
+            const row = Math.floor(i / columns);
+            const x = startX + col * (boxWidth + gap);
+            const y = startY + row * (boxHeight + gap);
             const grad = ctx.createLinearGradient(x, y, x, y + boxHeight);
             grad.addColorStop(0, '#222'); grad.addColorStop(1, '#111');
             ctx.fillStyle = grad; ctx.fillRect(x, y, boxWidth, boxHeight);
-            
+
             if (i === selectedUpgradeIndex || i === hoveredUpgradeIndex) {
                 ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 4; ctx.strokeRect(x - 2, y - 2, boxWidth + 4, boxHeight + 4);
             }
             ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, boxWidth, boxHeight);
 
-            ctx.fillStyle = '#00aaff'; ctx.font = 'bold 18px Arial'; ctx.fillText(opt.name, x + boxWidth / 2, y + 40);
-            ctx.fillStyle = '#ccc'; ctx.font = '14px Arial';
-            wrapText(ctx, opt.description, x + boxWidth / 2, y + 100, boxWidth - 20, 20);
+            ctx.fillStyle = '#00aaff'; ctx.font = `bold ${nameFontSize}px Arial`; ctx.fillText(opt.name, x + boxWidth / 2, y + 40 * responsiveScale);
+            ctx.fillStyle = '#ccc'; ctx.font = `${bodyFontSize}px Arial`;
+            wrapText(ctx, opt.description, x + boxWidth / 2, y + 100 * responsiveScale, boxWidth - 20, 20 * responsiveScale);
         });
     } else if (gameState === "gameover") {
         ctx.fillStyle = "rgba(10, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
