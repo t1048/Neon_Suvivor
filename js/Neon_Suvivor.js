@@ -7,11 +7,13 @@ const camera = { x: 0, y: 0, zoom: 1 };
 let viewWidth = canvas.width;
 let viewHeight = canvas.height;
 
+// Utility function to detect mobile landscape orientation
+function isMobileLandscape() {
+    return window.innerHeight < 600 && window.innerWidth > window.innerHeight;
+}
+
 function updateCameraZoom() {
-    // Detect mobile landscape: small height and wide width
-    const isMobileLandscape = window.innerHeight < 600 && window.innerWidth > window.innerHeight;
-    
-    if (isMobileLandscape) {
+    if (isMobileLandscape()) {
         camera.zoom = 0.6; // Zoom out more in landscape to show full view
     } else if (window.innerWidth < 768) {
         camera.zoom = 0.75; // Mobile portrait
@@ -302,11 +304,11 @@ let hoveredUpgradeIndex = -1;
 
 function getUpgradeLayout() {
     const isPortrait = canvas.width < canvas.height;
-    const isMobileLandscape = canvas.height < 600 && canvas.width > canvas.height;
+    const MIN_TOP_MARGIN = 40;
     
     // Smaller scale for mobile landscape to prevent cutoff
     let responsiveScale;
-    if (isMobileLandscape) {
+    if (isMobileLandscape()) {
         responsiveScale = Math.min(0.65, Math.max(0.5, canvas.height / 600));
     } else {
         responsiveScale = Math.min(1, Math.max(0.7, canvas.width / 1400));
@@ -324,7 +326,7 @@ function getUpgradeLayout() {
     const totalWidth = columns * boxWidth + (columns - 1) * gap;
     const totalHeight = rows * boxHeight + (rows - 1) * gap;
     const startX = (canvas.width - totalWidth) / 2;
-    const startY = Math.max(40 * responsiveScale, (canvas.height - totalHeight) / 2);
+    const startY = Math.max(MIN_TOP_MARGIN * responsiveScale, (canvas.height - totalHeight) / 2);
 
     return { boxWidth, boxHeight, gap, startX, startY, columns, rows, responsiveScale, isPortrait };
 }
