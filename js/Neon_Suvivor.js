@@ -6,6 +6,9 @@ const soundManager = new SoundManager();
 const camera = { x: 0, y: 0, zoom: 1 };
 let viewWidth = canvas.width;
 let viewHeight = canvas.height;
+// CSS (logical) pixel dimensions (canvas backing store is device pixels)
+let cssWidth = canvas.width / (window.devicePixelRatio || 1);
+let cssHeight = canvas.height / (window.devicePixelRatio || 1);
 
 // Utility function to detect mobile landscape orientation
 function isMobileLandscape() {
@@ -35,8 +38,11 @@ function updateCanvasSize() {
 
 function updateViewSize() {
     const dpr = window.devicePixelRatio || 1;
-    viewWidth = canvas.width / (camera.zoom * dpr);
-    viewHeight = canvas.height / (camera.zoom * dpr);
+    // cssWidth / cssHeight are logical (CSS) pixels
+    cssWidth = canvas.width / dpr;
+    cssHeight = canvas.height / dpr;
+    viewWidth = cssWidth / camera.zoom;
+    viewHeight = cssHeight / camera.zoom;
 }
 
 updateCanvasSize();
@@ -381,7 +387,7 @@ let selectedUpgradeIndex = 0;
 let hoveredUpgradeIndex = -1;
 
 function getUpgradeLayout() {
-    const isPortrait = canvas.width < canvas.height;
+    const isPortrait = cssWidth < cssHeight;
     const MIN_TOP_MARGIN = 40;
     
     let responsiveScale;
@@ -389,13 +395,13 @@ function getUpgradeLayout() {
 
     if (isPortrait) {
         // Portrait layout (Mobile Vertical)
-        responsiveScale = Math.min(1, Math.max(0.6, canvas.width / 400));
+        responsiveScale = Math.min(1, Math.max(0.6, cssWidth / 400));
         
         // Calculate available height for 3 cards with gaps and margins
         // Reserve space for title (approx 15% or 100px)
-        const topSpace = Math.max(80, canvas.height * 0.15);
-        const bottomSpace = Math.max(40, canvas.height * 0.05);
-        const availableHeight = canvas.height - topSpace - bottomSpace;
+        const topSpace = Math.max(80, cssHeight * 0.15);
+        const bottomSpace = Math.max(40, cssHeight * 0.05);
+        const availableHeight = cssHeight - topSpace - bottomSpace;
         
         gap = 20 * responsiveScale;
         
@@ -413,29 +419,29 @@ function getUpgradeLayout() {
     } else {
         // Landscape layout (Desktop / Mobile Horizontal)
         if (isMobileLandscape()) {
-            responsiveScale = Math.min(0.65, Math.max(0.5, canvas.height / 600));
+            responsiveScale = Math.min(0.65, Math.max(0.5, cssHeight / 600));
         } else {
-            responsiveScale = Math.min(1, Math.max(0.7, canvas.width / 1400));
+            responsiveScale = Math.min(1, Math.max(0.7, cssWidth / 1400));
         }
         
         boxWidth = 220 * responsiveScale;
         boxHeight = 280 * responsiveScale;
         gap = 20 * responsiveScale;
-        columns = Math.max(1, Math.min(3, Math.floor((canvas.width + gap) / (boxWidth + gap))));
+        columns = Math.max(1, Math.min(3, Math.floor((cssWidth + gap) / (boxWidth + gap))));
         rows = Math.max(1, Math.ceil(upgradeOptions.length / columns));
     }
 
     const totalWidth = columns * boxWidth + (columns - 1) * gap;
     const totalHeight = rows * boxHeight + (rows - 1) * gap;
     
-    const startX = (canvas.width - totalWidth) / 2;
+    const startX = (cssWidth - totalWidth) / 2;
     let startY;
     
     if (isPortrait) {
          // Center vertically but respect top margin for title
-         startY = Math.max(canvas.height * 0.15, (canvas.height - totalHeight) / 2 + (canvas.height * 0.05));
+         startY = Math.max(cssHeight * 0.15, (cssHeight - totalHeight) / 2 + (cssHeight * 0.05));
     } else {
-         startY = Math.max(MIN_TOP_MARGIN * responsiveScale, (canvas.height - totalHeight) / 2);
+         startY = Math.max(MIN_TOP_MARGIN * responsiveScale, (cssHeight - totalHeight) / 2);
     }
 
     return { boxWidth, boxHeight, gap, startX, startY, columns, rows, responsiveScale, isPortrait };
@@ -810,7 +816,8 @@ function drawGridLines(color) {
 }
 
 function animate() {
-    ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Use CSS (logical) pixels for full-screen operations since ctx is scaled by devicePixelRatio
+    ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, cssWidth, cssHeight);
 
     if (gameState === "playing") {
         frameCount++;
@@ -856,18 +863,18 @@ function animate() {
 
         const gridColor = isBossActive ? `rgba(255,0,0,${beat + 0.2})` : getWaveColor(beat);
 
-        // Boss Background Effect
+        // Boss Background Effect (use CSS pixels)
         if (isBossActive) {
             const pulse = 0.15 + Math.sin(frameCount * 0.1) * 0.05;
             ctx.fillStyle = `rgba(50, 0, 0, ${pulse})`;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, cssWidth, cssHeight);
 
             // Add Vignette
-            const grad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.height / 3, canvas.width / 2, canvas.height / 2, canvas.height);
+            const grad = ctx.createRadialGradient(cssWidth / 2, cssHeight / 2, cssHeight / 3, cssWidth / 2, cssHeight / 2, cssHeight);
             grad.addColorStop(0, 'transparent');
             grad.addColorStop(1, 'rgba(100, 0, 0, 0.4)');
             ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, cssWidth, cssHeight);
         }
 
         ctx.save();
@@ -996,7 +1003,8 @@ function animate() {
         ctx.fillStyle = player.color; ctx.beginPath(); ctx.arc(player.x - camera.x, player.y - camera.y, player.size, 0, 6.28); ctx.fill();
         ctx.restore();
 
-        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Overlay should cover css logical pixels
+        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0, 0, cssWidth, cssHeight);
         const { boxWidth, boxHeight, gap, startX, startY, columns, responsiveScale, isPortrait } = getUpgradeLayout();
 
         // Landscape-optimized font sizes
@@ -1005,7 +1013,7 @@ function animate() {
         const bodyFontSize = 14 * responsiveScale;
 
         ctx.fillStyle = "#fff"; ctx.font = `bold ${titleFontSize}px Arial`; ctx.textAlign = "center";
-        ctx.fillText("LEVEL UP", canvas.width / 2, Math.max(40, 70 * responsiveScale));
+        ctx.fillText("LEVEL UP", cssWidth / 2, Math.max(40, 70 * responsiveScale));
 
         upgradeOptions.forEach((opt, i) => {
             const col = i % columns;
@@ -1030,20 +1038,24 @@ function animate() {
             wrapText(ctx, opt.description, x + boxWidth / 2, textY, boxWidth - 20, lineHeight);
         });
     } else if (gameState === "gameover") {
-        ctx.fillStyle = "rgba(10, 0, 0, 0.9)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(10, 0, 0, 0.9)"; ctx.fillRect(0, 0, cssWidth, cssHeight);
 
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2;
-        const isPortrait = canvas.height > canvas.width;
-        const responsiveScale = clamp(Math.min(canvas.width / 1280, canvas.height / 720), 0.6, 1.1);
+        const cx = cssWidth / 2;
+        const cy = cssHeight / 2;
+        const isPortrait = cssHeight > cssWidth;
+        const responsiveScale = clamp(Math.min(cssWidth / 1280, cssHeight / 720), 0.5, 1.05);
 
-        const titleSize = clamp(32, 60 * responsiveScale, 72);
-        const headerSize = clamp(16, 20 * responsiveScale, 28);
-        const bodySize = clamp(12, 16 * responsiveScale, 22);
-        const subSize = clamp(10, 14 * responsiveScale, 18);
-        const lineGap = 24 * responsiveScale;
+        const titleSize = clamp(30, 54 * responsiveScale, 68);
+        const headerSize = clamp(14, 18 * responsiveScale, 26);
+        const bodySize = clamp(11, 15 * responsiveScale, 20);
+        const subSize = clamp(9, 13 * responsiveScale, 18);
+        const lineGap = clamp(18, 24 * responsiveScale, 30);
 
-        const titleY = isPortrait ? canvas.height * 0.18 : cy - 220 * responsiveScale;
+        const safeMargin = cssHeight * 0.05;
+        const safeBottom = cssHeight - safeMargin;
+        const titleY = safeMargin + titleSize;
+        const highScores = getHighScores();
+        const visibleScores = isPortrait ? highScores.slice(0, 3) : highScores.slice(0, 5);
 
         // Title
         ctx.fillStyle = "#ff0000";
@@ -1054,9 +1066,9 @@ function animate() {
         ctx.shadowBlur = 0;
 
         // Current Run Stats
-        const statsX = isPortrait ? canvas.width * 0.08 : cx - 320 * responsiveScale;
-        const statsY = isPortrait ? canvas.height * 0.30 : cy - 150 * responsiveScale;
-        const statsWidth = isPortrait ? canvas.width * 0.84 : 260 * responsiveScale;
+        const statsX = isPortrait ? cssWidth * 0.08 : cx - 320 * responsiveScale;
+        const statsY = isPortrait ? titleY + clamp(16, 36 * responsiveScale, 56) : cy - 150 * responsiveScale;
+        const statsWidth = isPortrait ? cssWidth * 0.84 : 260 * responsiveScale;
 
         ctx.fillStyle = "#00aaff"; ctx.textAlign = "left"; ctx.font = `bold ${headerSize}px 'Segoe UI'`;
         ctx.fillText("SESSION REPORT", statsX, statsY);
@@ -1070,22 +1082,24 @@ function animate() {
             `TOTAL DAMAGE: ${Math.floor(totalDamageDealt)}`,
             `WEAPONS:      ${player.weapons.length}`
         ];
+        const statsBlockHeight = (lines.length * lineGap) + (lineGap * 2) + (lineGap * Math.max(1, Math.ceil(player.weapons.length / 2)));
         lines.forEach((line, i) => {
             ctx.fillText(line, statsX, statsY + 30 * responsiveScale + (i * lineGap));
         });
 
         ctx.font = `${subSize}px Arial`; ctx.fillStyle = "#aaa";
-        wrapText(ctx, player.weapons.map(w => weapons[w].name).join(', '), statsX, statsY + 170 * responsiveScale, statsWidth, 16 * responsiveScale);
+        wrapText(ctx, player.weapons.map(w => weapons[w].name).join(', '), statsX, statsY + statsBlockHeight - (lineGap * 0.5), statsWidth, 16 * responsiveScale);
 
         // High Scores
         const boardX = isPortrait ? statsX : cx + 80 * responsiveScale;
-        const boardY = isPortrait ? statsY + 170 * responsiveScale : cy - 150 * responsiveScale;
+        const baseBoardY = isPortrait ? statsY + statsBlockHeight + clamp(12, 28 * responsiveScale, 48) : cy - 150 * responsiveScale;
+        const boardHeight = (visibleScores.length * 40 * responsiveScale) + 60 * responsiveScale;
+        const maxBoardY = safeBottom - boardHeight - clamp(60, 90 * responsiveScale, 120);
+        const boardY = Math.min(baseBoardY, maxBoardY);
         ctx.fillStyle = "#ffaa00"; ctx.font = `bold ${headerSize}px 'Segoe UI'`;
         ctx.fillText("HIGH SCORES", boardX, boardY);
-
-        const highScores = getHighScores();
         ctx.font = `${bodySize - 2}px 'Courier New'`;
-        highScores.forEach((s, i) => {
+        visibleScores.forEach((s, i) => {
             const y = boardY + 30 * responsiveScale + (i * 40 * responsiveScale);
             ctx.fillStyle = i === 0 ? "#ffff00" : "#fff";
             ctx.fillText(`${i + 1}. ${s.score} pts - Wave ${s.wave}`, boardX, y);
@@ -1094,7 +1108,8 @@ function animate() {
         });
 
         // Prompt
-        const btnY = isPortrait ? canvas.height * 0.87 : cy + 210 * responsiveScale;
+        const btnYBase = boardY + boardHeight + clamp(20, 36 * responsiveScale, 60);
+        const btnY = Math.min(safeBottom - clamp(10, 24 * responsiveScale, 40), btnYBase);
         if (frameCount % 60 < 30) {
             ctx.fillStyle = "#00ff00";
             ctx.font = `bold ${clamp(16, 24 * responsiveScale, 30)}px 'Courier New'`;
@@ -1111,7 +1126,7 @@ function animate() {
             ctx.globalCompositeOperation = 'saturation';
             ctx.fillStyle = '#ffffff';
             ctx.globalAlpha = progress;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, cssWidth, cssHeight);
             ctx.restore();
         }
 
@@ -1120,8 +1135,8 @@ function animate() {
             const noiseCount = Math.floor(progress * 100);
             for (let i = 0; i < noiseCount; i++) {
                 ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
-                const x = Math.random() * canvas.width;
-                const y = Math.random() * canvas.height;
+                const x = Math.random() * cssWidth;
+                const y = Math.random() * cssHeight;
                 const w = Math.random() * 50 + 1;
                 const h = Math.random() * 2 + 1;
                 ctx.fillRect(x, y, w, h);
@@ -1130,14 +1145,14 @@ function animate() {
 
         if (Math.random() < 0.05 + progress * 0.2) {
             const h = Math.random() * (50 + progress * 100) + 10;
-            const y = Math.random() * canvas.height;
+            const y = Math.random() * cssHeight;
             if (Math.random() < progress) {
                 const v = Math.random() * 50 + 200;
                 ctx.fillStyle = `rgba(${v}, ${v}, ${v}, ${0.2 + progress * 0.3})`;
             } else {
                 ctx.fillStyle = `rgba(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255}, 0.2)`;
             }
-            ctx.fillRect(0, y, canvas.width, h);
+            ctx.fillRect(0, y, cssWidth, h);
         }
 
         if (Math.random() < 0.02 + progress * 0.1) {
