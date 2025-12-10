@@ -34,8 +34,9 @@ function updateCanvasSize() {
 }
 
 function updateViewSize() {
-    viewWidth = canvas.width / camera.zoom;
-    viewHeight = canvas.height / camera.zoom;
+    const dpr = window.devicePixelRatio || 1;
+    viewWidth = canvas.width / (camera.zoom * dpr);
+    viewHeight = canvas.height / (camera.zoom * dpr);
 }
 
 updateCanvasSize();
@@ -171,7 +172,7 @@ window.addEventListener('blur', () => {
 });
 
 // Touch Controls State
-const JOYSTICK_CENTER_OFFSET = 40; // Center offset for joystick stick positioning (landscape optimized)
+const JOYSTICK_CENTER_OFFSET = 40; // Max distance the stick can travel from center
 let touchActive = false;
 let touchDx = 0;
 let touchDy = 0;
@@ -184,11 +185,21 @@ if (isTouchDevice()) {
     gameSubtitle.textContent = 'Use Joystick to Move | Boss Every 5 Waves';
 }
 
+function recenterJoystickStick() {
+    const rect = joystickZone.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    joystickStick.style.left = centerX + 'px';
+    joystickStick.style.top = centerY + 'px';
+}
+
 function handleJoystickStart(e) {
     touchActive = true;
     const rect = joystickZone.getBoundingClientRect();
     touchStartX = rect.left + rect.width / 2;
     touchStartY = rect.top + rect.height / 2;
+    // スティックの表示位置を中央にリセット
+    recenterJoystickStick();
 }
 
 function handleJoystickMove(e) {
@@ -210,8 +221,11 @@ function handleJoystickMove(e) {
         touchDy = Math.sin(angle) * (limitedDistance / JOYSTICK_CENTER_OFFSET);
         
         // Update joystick visual position
-        const stickX = JOYSTICK_CENTER_OFFSET + (touchDx * JOYSTICK_CENTER_OFFSET);
-        const stickY = JOYSTICK_CENTER_OFFSET + (touchDy * JOYSTICK_CENTER_OFFSET);
+        const rect = joystickZone.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const stickX = centerX + (touchDx * JOYSTICK_CENTER_OFFSET);
+        const stickY = centerY + (touchDy * JOYSTICK_CENTER_OFFSET);
         joystickStick.style.left = stickX + 'px';
         joystickStick.style.top = stickY + 'px';
     }
@@ -223,8 +237,7 @@ function handleJoystickEnd(e) {
     touchDy = 0;
     
     // Reset joystick to center
-    joystickStick.style.left = JOYSTICK_CENTER_OFFSET + 'px';
-    joystickStick.style.top = JOYSTICK_CENTER_OFFSET + 'px';
+    recenterJoystickStick();
 }
 
 // Add touch event listeners
@@ -958,23 +971,34 @@ function animate() {
 
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
+        const isPortrait = canvas.height > canvas.width;
+        const responsiveScale = clamp(Math.min(canvas.width / 1280, canvas.height / 720), 0.6, 1.1);
+
+        const titleSize = clamp(32, 60 * responsiveScale, 72);
+        const headerSize = clamp(16, 20 * responsiveScale, 28);
+        const bodySize = clamp(12, 16 * responsiveScale, 22);
+        const subSize = clamp(10, 14 * responsiveScale, 18);
+        const lineGap = 24 * responsiveScale;
+
+        const titleY = isPortrait ? canvas.height * 0.18 : cy - 220 * responsiveScale;
 
         // Title
         ctx.fillStyle = "#ff0000";
-        ctx.font = "900 60px 'Courier New'";
+        ctx.font = `900 ${titleSize}px 'Courier New'`;
         ctx.textAlign = "center";
-        ctx.shadowBlur = 20; ctx.shadowColor = "red";
-        ctx.fillText("SYSTEM FAILURE", cx, cy - 250);
+        ctx.shadowBlur = 20 * responsiveScale; ctx.shadowColor = "red";
+        ctx.fillText("SYSTEM FAILURE", cx, titleY);
         ctx.shadowBlur = 0;
 
         // Current Run Stats
-        ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.font = "bold 20px 'Segoe UI'";
-        const statsX = cx - 300;
-        const statsY = cy - 180;
+        const statsX = isPortrait ? canvas.width * 0.08 : cx - 320 * responsiveScale;
+        const statsY = isPortrait ? canvas.height * 0.30 : cy - 150 * responsiveScale;
+        const statsWidth = isPortrait ? canvas.width * 0.84 : 260 * responsiveScale;
 
-        ctx.fillStyle = "#00aaff"; ctx.fillText("SESSION REPORT", statsX, statsY);
-        ctx.fillStyle = "#fff"; ctx.font = "16px 'Courier New'";
+        ctx.fillStyle = "#00aaff"; ctx.textAlign = "left"; ctx.font = `bold ${headerSize}px 'Segoe UI'`;
+        ctx.fillText("SESSION REPORT", statsX, statsY);
 
+        ctx.fillStyle = "#fff"; ctx.font = `${bodySize}px 'Courier New'`;
         const timeStr = document.getElementById('timeDisplay').innerText;
         const lines = [
             `SCORE:        ${score}`,
@@ -983,33 +1007,34 @@ function animate() {
             `TOTAL DAMAGE: ${Math.floor(totalDamageDealt)}`,
             `WEAPONS:      ${player.weapons.length}`
         ];
-
         lines.forEach((line, i) => {
-            ctx.fillText(line, statsX, statsY + 30 + (i * 25));
+            ctx.fillText(line, statsX, statsY + 30 * responsiveScale + (i * lineGap));
         });
 
-        ctx.font = "12px Arial"; ctx.fillStyle = "#aaa";
-        wrapText(ctx, player.weapons.map(w => weapons[w].name).join(', '), statsX, statsY + 170, 250, 16);
+        ctx.font = `${subSize}px Arial`; ctx.fillStyle = "#aaa";
+        wrapText(ctx, player.weapons.map(w => weapons[w].name).join(', '), statsX, statsY + 170 * responsiveScale, statsWidth, 16 * responsiveScale);
 
-        const boardX = cx + 50;
-        const boardY = cy - 180;
-        ctx.fillStyle = "#ffaa00"; ctx.font = "bold 20px 'Segoe UI'";
+        // High Scores
+        const boardX = isPortrait ? statsX : cx + 80 * responsiveScale;
+        const boardY = isPortrait ? statsY + 170 * responsiveScale : cy - 150 * responsiveScale;
+        ctx.fillStyle = "#ffaa00"; ctx.font = `bold ${headerSize}px 'Segoe UI'`;
         ctx.fillText("HIGH SCORES", boardX, boardY);
 
         const highScores = getHighScores();
-        ctx.font = "14px 'Courier New'";
+        ctx.font = `${bodySize - 2}px 'Courier New'`;
         highScores.forEach((s, i) => {
-            const y = boardY + 30 + (i * 40);
+            const y = boardY + 30 * responsiveScale + (i * 40 * responsiveScale);
             ctx.fillStyle = i === 0 ? "#ffff00" : "#fff";
             ctx.fillText(`${i + 1}. ${s.score} pts - Wave ${s.wave}`, boardX, y);
             ctx.fillStyle = "#888";
-            ctx.fillText(`   ${s.date.split(' ')[0]}`, boardX, y + 15);
+            ctx.fillText(`   ${s.date.split(' ')[0]}`, boardX, y + 15 * responsiveScale);
         });
 
-        const btnY = cy + 200;
+        // Prompt
+        const btnY = isPortrait ? canvas.height * 0.87 : cy + 210 * responsiveScale;
         if (frameCount % 60 < 30) {
             ctx.fillStyle = "#00ff00";
-            ctx.font = "bold 24px 'Courier New'";
+            ctx.font = `bold ${clamp(16, 24 * responsiveScale, 30)}px 'Courier New'`;
             ctx.textAlign = "center";
             ctx.fillText("> CLICK TO REBOOT SYSTEM <", cx, btnY);
         }
