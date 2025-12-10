@@ -96,10 +96,6 @@ function hideAddressBar() {
 function handleViewportResize() {
     updateCanvasSize();
     updateCameraZoom();
-    // Re-hide address bar if needed on mobile
-    if (isTouchDevice() && gameState === "playing") {
-        setTimeout(() => window.scrollTo(0, 1), 100);
-    }
 }
 
 startBtn.addEventListener('click', () => {
