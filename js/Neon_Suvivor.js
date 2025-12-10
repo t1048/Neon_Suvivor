@@ -252,6 +252,37 @@ joystickZone.addEventListener('mousemove', handleJoystickMove);
 joystickZone.addEventListener('mouseup', handleJoystickEnd);
 joystickZone.addEventListener('mouseleave', handleJoystickEnd);
 
+canvas.addEventListener('touchstart', (e) => {
+    if (gameState === "levelup") {
+        e.preventDefault(); // Prevent scrolling
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const clickX = touch.clientX - rect.left;
+        const clickY = touch.clientY - rect.top;
+        
+        const { boxWidth, boxHeight, gap, startX, startY, columns } = getUpgradeLayout();
+
+        for (let i = 0; i < upgradeOptions.length; i++) {
+            const col = i % columns;
+            const row = Math.floor(i / columns);
+            const x = startX + col * (boxWidth + gap);
+            const y = startY + row * (boxHeight + gap);
+            if (clickX >= x && clickX <= x + boxWidth && clickY >= y && clickY <= y + boxHeight) {
+                selectedUpgradeIndex = i;
+                upgradeOptions[i].apply();
+                soundManager.playLevelUp();
+                gameState = "playing";
+                break;
+            }
+        }
+    } else if (gameState === "gameover") {
+        e.preventDefault();
+        resetGame();
+        gameState = "playing";
+        soundManager.startBGM();
+    }
+}, { passive: false });
+
 canvas.addEventListener('mousedown', (e) => {
     if (gameState === "gameover") {
         resetGame();
@@ -353,27 +384,59 @@ function getUpgradeLayout() {
     const isPortrait = canvas.width < canvas.height;
     const MIN_TOP_MARGIN = 40;
     
-    // Smaller scale for mobile landscape to prevent cutoff
     let responsiveScale;
-    if (isMobileLandscape()) {
-        responsiveScale = Math.min(0.65, Math.max(0.5, canvas.height / 600));
-    } else {
-        responsiveScale = Math.min(1, Math.max(0.7, canvas.width / 1400));
-    }
-    
     let boxWidth, boxHeight, gap, columns, rows;
 
-    // Landscape-only layout (no portrait branch)
-    boxWidth = 220 * responsiveScale;
-    boxHeight = 280 * responsiveScale;
-    gap = 20 * responsiveScale;
-    columns = Math.max(1, Math.min(3, Math.floor((canvas.width + gap) / (boxWidth + gap))));
-    rows = Math.max(1, Math.ceil(upgradeOptions.length / columns));
+    if (isPortrait) {
+        // Portrait layout (Mobile Vertical)
+        responsiveScale = Math.min(1, Math.max(0.6, canvas.width / 400));
+        
+        // Calculate available height for 3 cards with gaps and margins
+        // Reserve space for title (approx 15% or 100px)
+        const topSpace = Math.max(80, canvas.height * 0.15);
+        const bottomSpace = Math.max(40, canvas.height * 0.05);
+        const availableHeight = canvas.height - topSpace - bottomSpace;
+        
+        gap = 20 * responsiveScale;
+        
+        // Calculate max possible height per card to fit 3 vertically
+        const maxCardHeight = (availableHeight - (gap * 2)) / 3;
+        
+        // Standard card ratio is 220:280 (approx 0.78)
+        const cardRatio = 220 / 280;
+        
+        boxHeight = Math.min(280 * responsiveScale, maxCardHeight);
+        boxWidth = boxHeight * cardRatio;
+        
+        columns = 1;
+        rows = upgradeOptions.length;
+    } else {
+        // Landscape layout (Desktop / Mobile Horizontal)
+        if (isMobileLandscape()) {
+            responsiveScale = Math.min(0.65, Math.max(0.5, canvas.height / 600));
+        } else {
+            responsiveScale = Math.min(1, Math.max(0.7, canvas.width / 1400));
+        }
+        
+        boxWidth = 220 * responsiveScale;
+        boxHeight = 280 * responsiveScale;
+        gap = 20 * responsiveScale;
+        columns = Math.max(1, Math.min(3, Math.floor((canvas.width + gap) / (boxWidth + gap))));
+        rows = Math.max(1, Math.ceil(upgradeOptions.length / columns));
+    }
 
     const totalWidth = columns * boxWidth + (columns - 1) * gap;
     const totalHeight = rows * boxHeight + (rows - 1) * gap;
+    
     const startX = (canvas.width - totalWidth) / 2;
-    const startY = Math.max(MIN_TOP_MARGIN * responsiveScale, (canvas.height - totalHeight) / 2);
+    let startY;
+    
+    if (isPortrait) {
+         // Center vertically but respect top margin for title
+         startY = Math.max(canvas.height * 0.15, (canvas.height - totalHeight) / 2 + (canvas.height * 0.05));
+    } else {
+         startY = Math.max(MIN_TOP_MARGIN * responsiveScale, (canvas.height - totalHeight) / 2);
+    }
 
     return { boxWidth, boxHeight, gap, startX, startY, columns, rows, responsiveScale, isPortrait };
 }
