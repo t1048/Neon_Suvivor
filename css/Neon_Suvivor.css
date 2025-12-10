@@ -1,3 +1,9 @@
+html {
+    /* Prevent pull-to-refresh and overscroll on mobile */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+}
+
 body {
     margin: 0;
     overflow: hidden;
@@ -8,7 +14,15 @@ body {
     justify-content: flex-start;
     align-items: flex-start;
     height: 100vh;
+    height: 100dvh; /* Dynamic viewport height - accounts for mobile browser UI */
     user-select: none;
+    position: fixed;
+    width: 100vw;
+    width: 100dvw;
+    top: 0;
+    left: 0;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
 }
 
 canvas {
@@ -16,7 +30,9 @@ canvas {
     box-shadow: 0 0 50px rgba(0, 200, 255, 0.1);
     border: 1px solid #333;
     width: 100vw;
+    width: 100dvw;
     height: 100vh;
+    height: 100dvh;
 }
 
 #ui {

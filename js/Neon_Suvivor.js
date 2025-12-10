@@ -36,10 +36,8 @@ function updateViewSize() {
 
 updateCanvasSize();
 updateCameraZoom();
-window.addEventListener('resize', () => {
-    updateCanvasSize();
-    updateCameraZoom();
-});
+window.addEventListener('resize', handleViewportResize);
+window.addEventListener('orientationchange', handleViewportResize);
 
 // UI
 const startBtn = document.getElementById('startBtn');
@@ -71,6 +69,39 @@ const isTouchDevice = () => {
         (navigator.msMaxTouchPoints > 0));
 };
 
+// Function to hide address bar and enter fullscreen on mobile
+function hideAddressBar() {
+    // Scroll to hide address bar on mobile browsers
+    if (isTouchDevice()) {
+        window.scrollTo(0, 1);
+        setTimeout(() => window.scrollTo(0, 1), 100);
+    }
+    
+    // Try to request fullscreen API for better immersion
+    const docElement = document.documentElement;
+    if (docElement.requestFullscreen) {
+        docElement.requestFullscreen().catch(() => {
+            // Fullscreen request failed, that's okay - scrolling should help
+        });
+    } else if (docElement.webkitRequestFullscreen) {
+        docElement.webkitRequestFullscreen().catch(() => {});
+    } else if (docElement.mozRequestFullScreen) {
+        docElement.mozRequestFullScreen().catch(() => {});
+    } else if (docElement.msRequestFullscreen) {
+        docElement.msRequestFullscreen().catch(() => {});
+    }
+}
+
+// Update canvas size to handle dynamic viewport changes
+function handleViewportResize() {
+    updateCanvasSize();
+    updateCameraZoom();
+    // Re-hide address bar if needed on mobile
+    if (isTouchDevice() && gameState === "playing") {
+        setTimeout(() => window.scrollTo(0, 1), 100);
+    }
+}
+
 startBtn.addEventListener('click', () => {
     soundManager.init();
     soundManager.startBGM();
@@ -84,6 +115,9 @@ startBtn.addEventListener('click', () => {
     gameState = "playing";
     resetGame();
     animate();
+    
+    // Hide address bar on mobile devices
+    hideAddressBar();
 });
 
 muteBtn.addEventListener('click', () => {
