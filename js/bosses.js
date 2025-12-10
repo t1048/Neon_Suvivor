@@ -46,8 +46,8 @@ class BossBase {
         ctx.fillStyle = 'red'; ctx.fillRect(sx - 40, sy - 60, 80, 8);
         ctx.fillStyle = '#0f0'; ctx.fillRect(sx - 40, sy - 60, 80 * hpPercent, 8);
         ctx.strokeStyle = '#fff'; ctx.strokeRect(sx - 40, sy - 60, 80, 8);
-        ctx.fillStyle = this.color; ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center';
-        ctx.fillText(this.bossType.toUpperCase(), sx, sy - 65);
+        ctx.fillStyle = this.color; ctx.font = 'bold 18px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(this.bossType.toUpperCase(), sx, sy - 55);
     }
 
     takeDamage(dmg) {

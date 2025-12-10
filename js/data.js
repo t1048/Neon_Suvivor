@@ -6,28 +6,28 @@ const enemyTypes = {
 };
 
 const weaponsInitial = {
-    gun: { name: 'Plasma Gun', color: '#ffff00', description: 'Auto-fires at nearest enemy.', attackPower: 12, range: 320, cooldown: 28 },
-    scatter: { name: 'Scatter Shot', color: '#ffaa00', description: 'Close-range spread fire.', attackPower: 9, range: 180, cooldown: 55, count: 5, spread: 0.6 },
-    whip: { name: 'Nano Whip', color: '#ff00ff', description: 'Slashes BOTH sides.', attackPower: 45, range: 180, cooldown: 65 },
-    blade: { name: 'Photon Blade', color: '#00ffaa', description: 'Orbiting plasma blade.', attackPower: 25, range: 100, cooldown: 0, count: 1, rotSpeed: 0.08 },
-    sanctuary: { name: 'Void Field', color: '#00ffff', description: 'Damages enemies in aura.', attackPower: 1.5, range: 110, cooldown: 20 },
-    laser: { name: 'Railgun', color: '#ff0000', description: 'Pierces all enemies in line.', attackPower: 20, range: 480, cooldown: 60 },
-    bomb: { name: 'Plasma Grenade', color: '#ff8800', description: 'Throws an explosive bomb.', attackPower: 40, range: 250, cooldown: 110, explosionRadius: 100 },
-    thunder: { name: 'Tesla Coil', color: '#ffff88', description: 'Chains lightning to enemies.', attackPower: 22, range: 360, cooldown: 80, chainCount: 4 },
-    mine: { name: 'Spider Mine', color: '#ffff00', description: 'Drops mines that seek enemies.', attackPower: 35, range: 80, cooldown: 120, duration: 400, blastRadius: 95 }
+    gun: { name: 'Plasma Gun', color: '#ffff00', description: '最も近い敵を自動で攻撃する。', attackPower: 12, range: 320, cooldown: 28 },
+    scatter: { name: 'Scatter Shot', color: '#ffaa00', description: '近距離に拡散弾を発射する。', attackPower: 9, range: 180, cooldown: 55, count: 5, spread: 0.6 },
+    whip: { name: 'Nano Whip', color: '#ff00ff', description: '左右両方を同時に攻撃する。', attackPower: 45, range: 180, cooldown: 65 },
+    blade: { name: 'Photon Blade', color: '#00ffaa', description: '自機の周囲を回転するプラズマブレード。', attackPower: 25, range: 100, cooldown: 0, count: 1, rotSpeed: 0.08 },
+    sanctuary: { name: 'Void Field', color: '#00ffff', description: '範囲内の敵に継続ダメージを与える。', attackPower: 1.5, range: 110, cooldown: 20 },
+    laser: { name: 'Railgun', color: '#ff0000', description: '一直線上の敵を貫通するレーザー。', attackPower: 20, range: 480, cooldown: 60 },
+    bomb: { name: 'Plasma Grenade', color: '#ff8800', description: '爆発するグレネードを投げる。', attackPower: 40, range: 250, cooldown: 110, explosionRadius: 100 },
+    thunder: { name: 'Tesla Coil', color: '#ffff88', description: '敵に連鎖する雷を放つ。', attackPower: 22, range: 360, cooldown: 80, chainCount: 4 },
+    mine: { name: 'Spider Mine', color: '#ffff00', description: '敵を追尾する地雷を設置する。', attackPower: 35, range: 80, cooldown: 120, duration: 400, blastRadius: 95 }
 };
 
 // Deep clone for actual use
 let weapons = JSON.parse(JSON.stringify(weaponsInitial));
 
 const upgrades = [
-    { id: 'atk', name: 'Power Up', description: 'DMG +20%', apply: () => player.weapons.forEach(k => weapons[k].attackPower *= 1.2) },
-    { id: 'spd', name: 'Agility', description: 'Speed +10%', apply: () => player.speed *= 1.1 },
-    { id: 'hp', name: 'Vitality', description: 'HP +20 & Heal', apply: () => { player.maxHp += 20; player.hp = player.maxHp; } },
+    { id: 'atk', name: 'Power Up', description: '攻撃力+20%', apply: () => player.weapons.forEach(k => weapons[k].attackPower *= 1.2) },
+    { id: 'spd', name: 'Agility', description: '移動速度+10%', apply: () => player.speed *= 1.1 },
+    { id: 'hp', name: 'Vitality', description: '最大HP+20＆全回復', apply: () => { player.maxHp += 20; player.hp = player.maxHp; } },
     {
         id: 'cdr',
         name: 'Overclock',
-        description: 'Cooldown -10%',
+        description: 'クールダウン-10%',
         apply: () => player.weapons.forEach(k => {
             const w = weapons[k];
             w.cooldown *= 0.9;
@@ -37,7 +37,7 @@ const upgrades = [
     {
         id: 'rng',
         name: 'Scope',
-        description: 'Range +20%, Area +10%',
+        description: '射程+20%、爆発範囲+10%',
         apply: () => {
             player.weapons.forEach(k => {
                 weapons[k].range *= 1.20;
@@ -47,12 +47,12 @@ const upgrades = [
             addFloatingText(player.x, player.y, 'SCOPE UP!', '#00ffff');
         }
     },
-    { id: 'mag', name: 'Magnet', description: 'Pickup +30%', apply: () => player.magnetRadius *= 1.3 },
-    { id: 'exp', name: 'Learning', description: 'EXP +6%', apply: () => player.expMult += 0.06 },
+    { id: 'mag', name: 'Magnet', description: 'アイテム吸収範囲+30%', apply: () => player.magnetRadius *= 1.3 },
+    { id: 'exp', name: 'Learning', description: '獲得経験値+12%', apply: () => player.expMult += 0.12 },
     {
         id: 'curse',
         name: 'Cursed Sigil',
-        description: 'Enemy HP +30%, EXP +50%',
+        description: '敵HP+30%、獲得経験値+50%',
         apply: () => {
             enemyGlobalHpMul *= 1.3;
             player.expMult += 0.5;
@@ -62,7 +62,7 @@ const upgrades = [
     {
         id: 'adrenaline',
         name: 'Adrenaline',
-        description: 'Low HP = Faster Cooldown',
+        description: 'HPが低いほどクールダウン短縮',
         apply: () => {
             player.adrenaline++;
             addFloatingText(player.x, player.y, "RUSH!", "#ff0055");
@@ -71,7 +71,7 @@ const upgrades = [
     {
         id: 'vital_strike',
         name: 'Vital Strike',
-        description: 'Full HP = High DMG',
+        description: 'HP満タン時に攻撃力アップ',
         apply: () => {
             player.vitalStrike++;
             addFloatingText(player.x, player.y, "VITAL!", "#00ff88");
@@ -80,7 +80,7 @@ const upgrades = [
     {
         id: 'fortress',
         name: 'Fortress',
-        description: 'Armor UP, Speed DOWN',
+        description: '被ダメージ減少、移動速度低下',
         apply: () => {
             player.damageReduction += 0.15; // 15% reduction
             player.speed *= 0.9; // 10% slow
