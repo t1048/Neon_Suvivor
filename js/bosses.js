@@ -85,10 +85,10 @@ class Boss extends BossBase {
         const a = Math.atan2(player.y - this.y, player.x - this.x);
         this.x += Math.cos(a) * this.speed;
         this.y += Math.sin(a) * this.speed;
-        if (this.flash > 0) this.flash--;
+            if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
         this.checkPlayerCollision(20);
 
-        this.attackTimer++;
+            this.attackTimer += dtFrames;
         if (this.attackTimer > 100) {
             this.attackTimer = 0;
             for (let i = -2; i <= 2; i++) {
@@ -124,21 +124,25 @@ class BossCharger extends BossBase {
         this.chargeTargetX = 0;
         this.chargeTargetY = 0;
         this.trail = [];
+            this.trailAccumulator = 0;
     }
 
     update() {
-        if (this.flash > 0) this.flash--;
+        if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
 
         if (this.isCharging) {
             const a = Math.atan2(this.chargeTargetY - this.y, this.chargeTargetX - this.x);
             this.x += Math.cos(a) * this.chargeSpeed;
             this.y += Math.sin(a) * this.chargeSpeed;
 
-            if (frameCount % 2 === 0) {
+                // Spawn trail every 2 frames equivalent (0.033 seconds)
+                this.trailAccumulator += dtSeconds;
+                if (this.trailAccumulator >= 0.033) {
+                    this.trailAccumulator -= 0.033;
                 this.trail.push({ x: this.x, y: this.y, life: 15 });
             }
 
-            this.chargeTimer--;
+                this.chargeTimer = Math.max(0, this.chargeTimer - dtFrames);
             if (this.chargeTimer <= 0) {
                 this.isCharging = false;
                 this.chargeCooldown = 180 + Math.floor(Math.random() * 180);
@@ -152,7 +156,7 @@ class BossCharger extends BossBase {
             this.y += Math.sin(a) * this.speed;
             this.checkPlayerCollision(15);
 
-            this.chargeCooldown--;
+                this.chargeCooldown = Math.max(0, this.chargeCooldown - dtFrames);
             if (this.chargeCooldown <= 0) {
                 this.isCharging = true;
                 this.chargeTimer = 60;
@@ -165,7 +169,7 @@ class BossCharger extends BossBase {
             }
         }
 
-        this.trail.forEach(t => t.life--);
+    this.trail.forEach(t => t.life = Math.max(0, t.life - dtFrames));
         this.trail = this.trail.filter(t => t.life > 0);
     }
 
@@ -225,7 +229,7 @@ class BossSniper extends BossBase {
     }
 
     update() {
-        if (this.flash > 0) this.flash--;
+        if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
 
         const dist = Math.hypot(player.x - this.x, player.y - this.y);
         const a = Math.atan2(player.y - this.y, player.x - this.x);
@@ -246,7 +250,7 @@ class BossSniper extends BossBase {
 
         this.checkPlayerCollision(10);
 
-        this.attackTimer++;
+    this.attackTimer += dtFrames;
         if (!this.isChargingLaser && this.attackTimer > 100) {
             this.isChargingLaser = true;
             this.laserChargeTime = 60;
@@ -255,7 +259,7 @@ class BossSniper extends BossBase {
         }
 
         if (this.isChargingLaser) {
-            this.laserChargeTime--;
+            this.laserChargeTime = Math.max(0, this.laserChargeTime - dtFrames);
             this.laserTargetX += (player.x - this.laserTargetX) * 0.02;
             this.laserTargetY += (player.y - this.laserTargetY) * 0.02;
 
@@ -332,10 +336,10 @@ class BossTeleporter extends BossBase {
     }
 
     update() {
-        if (this.flash > 0) this.flash--;
+        if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
 
         if (this.isTeleporting) {
-            this.teleportPhase++;
+            this.teleportPhase += dtFrames;
             if (this.teleportPhase < 15) {
                 this.alpha = 1 - this.teleportPhase / 15;
             } else if (this.teleportPhase === 15) {
@@ -359,7 +363,7 @@ class BossTeleporter extends BossBase {
             this.x += Math.cos(a) * this.speed;
             this.y += Math.sin(a) * this.speed;
 
-            this.teleportCooldown--;
+            this.teleportCooldown = Math.max(0, this.teleportCooldown - dtFrames);
             if (this.teleportCooldown <= 0) {
                 this.isTeleporting = true;
                 this.teleportPhase = 0;
@@ -446,7 +450,7 @@ class BossSummoner extends BossBase {
     }
 
     update() {
-        if (this.flash > 0) this.flash--;
+        if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
 
         const dist = Math.hypot(player.x - this.x, player.y - this.y);
         const a = Math.atan2(player.y - this.y, player.x - this.x);
@@ -464,7 +468,7 @@ class BossSummoner extends BossBase {
 
         this.checkPlayerCollision(15);
 
-        this.summonCooldown--;
+    this.summonCooldown = Math.max(0, this.summonCooldown - dtFrames);
         if (this.summonCooldown <= 0) {
             this.summonCooldown = 180;
             const count = 3 + Math.floor(Math.random() * 3);
@@ -485,10 +489,10 @@ class BossSummoner extends BossBase {
         this.orbits = this.orbits.filter(o => o.life > 0);
         this.orbits.forEach((o, i) => {
             o.angle += 0.05;
-            o.life--;
+                o.life = Math.max(0, o.life - dtFrames);
         });
 
-        this.attackTimer++;
+            this.attackTimer += dtFrames;
         if (this.attackTimer > 120) {
             this.attackTimer = 0;
             for (let i = 0; i < 6; i++) {
@@ -563,13 +567,14 @@ class BossTank extends BossBase {
         this.beamAngle = 0;
         this.beamDuration = 180;
         this.beamWarningTime = 60;
+            this.particleAccumulator = 0;
     }
 
     update() {
-        if (this.flash > 0) this.flash--;
+        if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
 
         if (this.isSlammingDown) {
-            this.slamPhase++;
+            this.slamPhase += dtFrames;
 
             // Phase 1: Jump Up (0-40)
             if (this.slamPhase < 40) {
@@ -598,7 +603,7 @@ class BossTank extends BossBase {
                 this.slamCooldown = 120;
             }
         } else if (this.isBeaming) {
-            this.beamTimer++;
+            this.beamTimer += dtFrames;
             if (this.beamTimer < this.beamWarningTime) {
                 const targetAngle = Math.atan2(player.y - this.y, player.x - this.x);
                 let diff = targetAngle - this.beamAngle;
@@ -621,7 +626,12 @@ class BossTank extends BossBase {
                     }
                 }
 
-                if (frameCount % 4 === 0) createParticles(this.x + Math.cos(this.beamAngle) * 50, this.y + Math.sin(this.beamAngle) * 50, '#ff0000', 2);
+                    // Spawn particles every 4 frames equivalent (0.067 seconds)
+                    this.particleAccumulator += dtSeconds;
+                    if (this.particleAccumulator >= 0.067) {
+                        this.particleAccumulator -= 0.067;
+                        createParticles(this.x + Math.cos(this.beamAngle) * 50, this.y + Math.sin(this.beamAngle) * 50, '#ff0000', 2);
+                    }
             }
             else {
                 this.isBeaming = false;
@@ -632,7 +642,7 @@ class BossTank extends BossBase {
             this.x += Math.cos(a) * this.speed;
             this.y += Math.sin(a) * this.speed;
 
-            this.slamCooldown--;
+            this.slamCooldown = Math.max(0, this.slamCooldown - dtFrames);
             if (this.slamCooldown <= 0 && Math.hypot(player.x - this.x, player.y - this.y) < this.slamRadius) {
                 this.isSlammingDown = true;
                 this.slamPhase = 0;
@@ -641,7 +651,7 @@ class BossTank extends BossBase {
 
             this.checkPlayerCollision(25);
 
-            this.beamCooldown--;
+            this.beamCooldown = Math.max(0, this.beamCooldown - dtFrames);
             if (this.beamCooldown <= 0) {
                 this.isBeaming = true;
                 this.beamTimer = 0;
@@ -773,7 +783,7 @@ class Enemy {
         const a = Math.atan2(player.y - this.y, player.x - this.x);
         this.x += Math.cos(a) * this.speed + this.pushX;
         this.y += Math.sin(a) * this.speed + this.pushY;
-        if (this.flash > 0) this.flash--;
+            if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
 
         if (Math.hypot(player.x - this.x, player.y - this.y) < player.size + this.size) {
             takePlayerDamage(5);

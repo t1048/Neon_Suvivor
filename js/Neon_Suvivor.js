@@ -168,6 +168,13 @@ let timeSeconds = 0;
 let isBossActive = false;
 let enemyGlobalHpMul = 1;
 
+// Delta-time for frame-rate independence
+const MAX_DT = 0.25; // Max 250ms to prevent huge jumps on tab resume
+let lastTimestamp = 0;
+let dtSeconds = 0;
+let dtFrames = 0;
+let spawnAccumulator = 0; // Time accumulator for spawning
+
 const keys = {};
 window.addEventListener('keydown', (e) => keys[e.key] = true);
 window.addEventListener('keyup', (e) => keys[e.key] = false);
@@ -453,6 +460,8 @@ let spawnRate = 60;
 function resetGame() {
     weapons = JSON.parse(JSON.stringify(weaponsInitial));
 
+    lastTimestamp = 0; // Reset delta-time tracking
+    spawnAccumulator = 0;
     player.maxHp = 100;
     player.hp = 100;
     player.speed = 4.0;
@@ -550,7 +559,7 @@ function spawnBoss() {
 }
 
 function updatePlayer() {
-    if (player.contactDamageCooldown > 0) player.contactDamageCooldown--;
+    if (player.contactDamageCooldown > 0) player.contactDamageCooldown = Math.max(0, player.contactDamageCooldown - dtFrames);
     const cooldownBoost = calcCooldownBoost();
     let dx = 0, dy = 0;
     
@@ -586,7 +595,7 @@ function updatePlayer() {
     }
 
     player.weapons.forEach(key => {
-        if (player.weaponCooldowns[key] > 0) player.weaponCooldowns[key] -= cooldownBoost;
+        if (player.weaponCooldowns[key] > 0) player.weaponCooldowns[key] = Math.max(0, player.weaponCooldowns[key] - cooldownBoost * dtFrames);
         else {
             const w = weapons[key];
             const effectiveFrames = w.cooldown / cooldownBoost;
@@ -688,7 +697,12 @@ function updatePlayer() {
                     }
                 });
                 player.weaponCooldowns[key] = w.cooldown;
-                if (frameCount % 5 === 0) sanctuaryParticles.push({ x: player.x + (Math.random() - 0.5) * w.range * 1.5, y: player.y + (Math.random() - 0.5) * w.range * 1.5, life: 20 });
+                    // Spawn particles periodically using integer frame detection
+                    const prevFrame = Math.floor(frameCount - dtFrames);
+                    const currFrame = Math.floor(frameCount);
+                    if (Math.floor(prevFrame / 5) !== Math.floor(currFrame / 5)) {
+                        sanctuaryParticles.push({ x: player.x + (Math.random() - 0.5) * w.range * 1.5, y: player.y + (Math.random() - 0.5) * w.range * 1.5, life: 20 });
+                    }
             }
             else if (key === 'mine') {
                 mines.push(new Landmine(player.x, player.y));
@@ -815,46 +829,61 @@ function drawGridLines(color) {
     ctx.stroke();
 }
 
-function animate() {
+function animate(timestamp = 0) {
+    // Compute delta-time for frame-rate independence
+    if (lastTimestamp === 0) lastTimestamp = timestamp;
+    dtSeconds = Math.min((timestamp - lastTimestamp) / 1000, MAX_DT);
+    dtFrames = dtSeconds * 60; // Convert to "frames equivalent" at 60 FPS
+    lastTimestamp = timestamp;
+
     // Use CSS (logical) pixels for full-screen operations since ctx is scaled by devicePixelRatio
     ctx.fillStyle = '#050505'; ctx.fillRect(0, 0, cssWidth, cssHeight);
 
     if (gameState === "playing") {
-        frameCount++;
+        frameCount += dtFrames;
         updatePlayer();
 
-        const spawnInterval = Math.max(10, spawnRate - wave * 2);
+        // Spawn enemies using time accumulator
+        const spawnInterval = Math.max(10, spawnRate - wave * 2) / 60; // Convert frames to seconds
         const bossSpawnModifier = isBossActive ? 1.43 : 1;
-        if (frameCount % Math.floor(spawnInterval * bossSpawnModifier) === 0) {
+        spawnAccumulator += dtSeconds;
+        
+        const spawnThreshold = spawnInterval * bossSpawnModifier;
+        while (spawnAccumulator >= spawnThreshold) {
+            spawnAccumulator -= spawnThreshold;
             let enemiesToSpawn = 1;
             if (wave > 30) {
                 enemiesToSpawn += Math.floor((wave - 30) / 4);
             }
+            // Cap spawns per frame to prevent burst on resume
+            const maxSpawnsThisFrame = 5;
+            enemiesToSpawn = Math.min(enemiesToSpawn, maxSpawnsThisFrame);
             for (let i = 0; i < enemiesToSpawn; i++) {
                 enemies.push(new Enemy());
             }
         }
 
-        if (frameCount % 60 === 0) {
-            timeSeconds++;
-
-            if (timeSeconds % 30 === 0) {
-                wave++;
-                if (wave <= 35) {
-                    enemyBaseHp = 10 * Math.pow(wave, 0.9);
-                } else {
-                    enemyBaseHp = (10 * Math.pow(35, 0.9)) + (wave - 35) * 50;
-                }
-                soundManager.setWave(wave);
-                if (wave % 5 === 0) {
-                    spawnBoss();
-                }
-                updateUI();
+        // Time tracking with accumulator for frame-rate independence
+        timeSeconds += dtSeconds;
+        const currentWaveCheck = Math.floor(timeSeconds / 30);
+        if (currentWaveCheck > wave - 1) {
+            wave = currentWaveCheck + 1;
+            if (wave <= 35) {
+                enemyBaseHp = 10 * Math.pow(wave, 0.9);
+            } else {
+                enemyBaseHp = (10 * Math.pow(35, 0.9)) + (wave - 35) * 50;
             }
-            const m = Math.floor(timeSeconds / 60).toString().padStart(2, '0');
-            const s = (timeSeconds % 60).toString().padStart(2, '0');
-            document.getElementById('timeDisplay').innerText = m + ":" + s;
+            soundManager.setWave(wave);
+            if (wave % 5 === 0) {
+                spawnBoss();
+            }
+            updateUI();
         }
+        
+        // Update time display
+        const m = Math.floor(timeSeconds / 60).toString().padStart(2, '0');
+        const s = Math.floor(timeSeconds % 60).toString().padStart(2, '0');
+        document.getElementById('timeDisplay').innerText = m + ":" + s;
 
         // Grid and Background
         const waveIntensity = 1 + (Math.min(wave, 30) / 30) * 0.5;
@@ -974,7 +1003,7 @@ function animate() {
         rotatingBlades.forEach(b => b.draw(weapons.blade));
 
         sanctuaryParticles.forEach((p, i) => {
-            p.life--;
+          p.life = Math.max(0, p.life - dtFrames);
             ctx.fillStyle = `rgba(0, 255, 255, ${p.life / 20})`;
             ctx.fillRect(p.x - camera.x, p.y - camera.y, 4, 4);
             if (p.life <= 0) sanctuaryParticles.splice(i, 1);

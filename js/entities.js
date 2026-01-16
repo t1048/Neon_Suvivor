@@ -5,7 +5,7 @@ class FloatingText {
         this.text = text; this.color = color;
         this.life = 40; this.vy = -1.5;
     }
-    update() { this.y += this.vy; this.life--; }
+    update() { this.y += this.vy; this.life = Math.max(0, this.life - dtFrames); }
     draw() {
         if (this.life <= 0) return;
         const sx = this.x - camera.x, sy = this.y - camera.y;
@@ -22,7 +22,7 @@ class Particle {
         this.vx = Math.cos(a) * s; this.vy = Math.sin(a) * s;
         this.life = 30; this.size = Math.random() * 3 + 1;
     }
-    update() { this.x += this.vx; this.y += this.vy; this.life--; this.vx *= 0.9; this.vy *= 0.9; }
+    update() { this.x += this.vx; this.y += this.vy; this.life = Math.max(0, this.life - dtFrames); this.vx *= 0.9; this.vy *= 0.9; }
     draw() {
         ctx.globalAlpha = this.life / 30; ctx.fillStyle = this.color;
         ctx.fillRect(this.x - camera.x, this.y - camera.y, this.size, this.size); ctx.globalAlpha = 1;
@@ -44,8 +44,9 @@ class Bullet {
         this.marked = false;
     }
     update() {
-        this.x += this.vx; this.y += this.vy;
-        this.life--;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life = Math.max(0, this.life - dtFrames);
 
         // For scatter shot: fade out near end
         this.alpha = 1;
@@ -83,9 +84,9 @@ class BombProjectile {
         this.vy = (ty - y) / this.duration;
     }
     update() {
-        this.progress++;
-        this.x += this.vx;
-        this.y += this.vy;
+        this.progress += dtFrames;
+        this.x += this.vx * dtFrames;
+        this.y += this.vy * dtFrames;
         const p = this.progress / this.duration;
         this.height = Math.sin(p * Math.PI) * 50;
 
@@ -120,9 +121,10 @@ class BombProjectile {
 class RotatingBlade {
     constructor(angleOffset) {
         this.angle = angleOffset;
+            this.hitAccumulator = 0; // Track time for periodic hit detection
     }
     update(weaponData, speedBoost = 1) {
-        this.angle += weaponData.rotSpeed * speedBoost;
+            this.angle += weaponData.rotSpeed * speedBoost * dtFrames;
         const range = weaponData.range;
 
         // Blade Geometry (Sweeping Beam)
@@ -134,7 +136,10 @@ class RotatingBlade {
 
         const thickness = 25 * (range / 100);
 
-        if (frameCount % 10 === 0) { // Hit tick
+            // Hit tick every 10 frames equivalent (0.167 seconds)
+            this.hitAccumulator += dtSeconds;
+            if (this.hitAccumulator >= 0.167) {
+                this.hitAccumulator -= 0.167;
             enemies.forEach(e => {
                 // Check distance to the blade line segment
                 const dist = pointLineDist(e.x, e.y, startX, startY, tipX, tipY);
@@ -200,8 +205,8 @@ class WhipHitbox {
         this.width = Math.PI / 4;
     }
     update() {
-        this.life--;
-        if (this.life === 8) {
+        this.life = Math.max(0, this.life - dtFrames);
+        if (this.life >= (this.maxLife - 2 * dtFrames) && this.life <= (this.maxLife - 2 * dtFrames + dtFrames)) {
             const dmg = weapons.whip.attackPower * getDamageMultiplier();
             enemies.forEach(e => {
                 const dx = e.x - this.x;
@@ -246,7 +251,7 @@ class ThunderStrike {
         this.segments = [{ x: x, y: y }, ...targets];
         this.life = 10;
     }
-    update() { this.life--; }
+    update() { this.life = Math.max(0, this.life - dtFrames); }
     draw() {
         ctx.strokeStyle = '#ffff88'; ctx.lineWidth = 2; ctx.shadowBlur = 15; ctx.shadowColor = '#ffff88';
         ctx.globalAlpha = this.life / 10;
@@ -269,8 +274,8 @@ class Landmine {
         this.armTimer = 30; // Delay before arming
     }
     update() {
-        this.life--;
-        if (this.armTimer > 0) this.armTimer--;
+        this.life = Math.max(0, this.life - dtFrames);
+        if (this.armTimer > 0) this.armTimer = Math.max(0, this.armTimer - dtFrames);
         else this.active = true;
 
         if (this.active) {
