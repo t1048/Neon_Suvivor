@@ -89,7 +89,7 @@ class Boss extends BossBase {
         this.checkPlayerCollision(20);
 
             this.attackTimer += dtFrames;
-        if (this.attackTimer > 100) {
+        if (this.attackTimer > 60) {
             this.attackTimer = 0;
             for (let i = -2; i <= 2; i++) {
                 const targetX = player.x + Math.cos(a + i * 0.2) * 200;
@@ -145,7 +145,7 @@ class BossCharger extends BossBase {
                 this.chargeTimer = Math.max(0, this.chargeTimer - dtFrames);
             if (this.chargeTimer <= 0) {
                 this.isCharging = false;
-                this.chargeCooldown = 180 + Math.floor(Math.random() * 180);
+                this.chargeCooldown = 100 + Math.floor(Math.random() * 100);
                 soundManager.playExplosion();
                 createParticles(this.x, this.y, this.color, 10);
             }
@@ -251,7 +251,7 @@ class BossSniper extends BossBase {
         this.checkPlayerCollision(10);
 
     this.attackTimer += dtFrames;
-        if (!this.isChargingLaser && this.attackTimer > 100) {
+        if (!this.isChargingLaser && this.attackTimer > 60) {
             this.isChargingLaser = true;
             this.laserChargeTime = 60;
             this.laserTargetX = player.x;
@@ -350,7 +350,7 @@ class BossTeleporter extends BossBase {
                 this.alpha = (this.teleportPhase - 15) / 15;
             } else {
                 this.isTeleporting = false;
-                this.teleportCooldown = 200;
+                this.teleportCooldown = 120;
                 this.alpha = 1;
                 for (let i = 0; i < 4; i++) {
                     const angle = (i / 4) * Math.PI * 2;
@@ -470,7 +470,7 @@ class BossSummoner extends BossBase {
 
     this.summonCooldown = Math.max(0, this.summonCooldown - dtFrames);
         if (this.summonCooldown <= 0) {
-            this.summonCooldown = 180;
+            this.summonCooldown = 110;
             const count = 3 + Math.floor(Math.random() * 3);
             for (let i = 0; i < count; i++) {
                 const spawnAngle = (i / count) * Math.PI * 2;
@@ -493,7 +493,7 @@ class BossSummoner extends BossBase {
         });
 
             this.attackTimer += dtFrames;
-        if (this.attackTimer > 120) {
+        if (this.attackTimer > 70) {
             this.attackTimer = 0;
             for (let i = 0; i < 6; i++) {
                 const angle = (i / 6) * Math.PI * 2;
@@ -561,7 +561,7 @@ class BossTank extends BossBase {
         this.jumpHeight = 0;
         this.slamRadius = 250;
 
-        this.beamCooldown = 100;
+        this.beamCooldown = 60;
         this.isBeaming = false;
         this.beamTimer = 0;
         this.beamAngle = 0;
@@ -600,7 +600,7 @@ class BossTank extends BossBase {
             // Phase 4: Recovery (50-90)
             if (this.slamPhase >= 90) {
                 this.isSlammingDown = false;
-                this.slamCooldown = 120;
+                this.slamCooldown = 70;
             }
         } else if (this.isBeaming) {
             this.beamTimer += dtFrames;
@@ -635,7 +635,7 @@ class BossTank extends BossBase {
             }
             else {
                 this.isBeaming = false;
-                this.beamCooldown = 300;
+                this.beamCooldown = 180;
             }
         } else {
             const a = Math.atan2(player.y - this.y, player.x - this.x);

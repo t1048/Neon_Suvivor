@@ -6,15 +6,15 @@ const enemyTypes = {
 };
 
 const weaponsInitial = {
-    gun: { name: 'Plasma Gun', color: '#ffff00', description: '最も近い敵を自動で攻撃する。', attackPower: 12, range: 320, cooldown: 28 },
-    scatter: { name: 'Scatter Shot', color: '#ffaa00', description: '近距離に拡散弾を発射する。', attackPower: 9, range: 180, cooldown: 55, count: 5, spread: 0.6 },
-    whip: { name: 'Nano Whip', color: '#ff00ff', description: '左右両方を同時に攻撃する。', attackPower: 45, range: 180, cooldown: 65 },
+    gun: { name: 'Plasma Gun', color: '#ffff00', description: '最も近い敵を自動で攻撃する。', attackPower: 12, range: 320, cooldown: 15 },
+    scatter: { name: 'Scatter Shot', color: '#ffaa00', description: '近距離に拡散弾を発射する。', attackPower: 9, range: 180, cooldown: 30, count: 5, spread: 0.6 },
+    whip: { name: 'Nano Whip', color: '#ff00ff', description: '左右両方を同時に攻撃する。', attackPower: 45, range: 180, cooldown: 35 },
     blade: { name: 'Photon Blade', color: '#00ffaa', description: '自機の周囲を回転するプラズマブレード。', attackPower: 25, range: 100, cooldown: 0, count: 1, rotSpeed: 0.08 },
-    sanctuary: { name: 'Void Field', color: '#00ffff', description: '範囲内の敵に継続ダメージを与える。', attackPower: 1.5, range: 110, cooldown: 20 },
-    laser: { name: 'Railgun', color: '#ff0000', description: '一直線上の敵を貫通するレーザー。', attackPower: 20, range: 480, cooldown: 60 },
-    bomb: { name: 'Plasma Grenade', color: '#ff8800', description: '爆発するグレネードを投げる。', attackPower: 40, range: 250, cooldown: 110, explosionRadius: 100 },
-    thunder: { name: 'Tesla Coil', color: '#ffff88', description: '敵に連鎖する雷を放つ。', attackPower: 22, range: 360, cooldown: 80, chainCount: 4 },
-    mine: { name: 'Spider Mine', color: '#ffff00', description: '敵を追尾する地雷を設置する。', attackPower: 35, range: 80, cooldown: 120, duration: 400, blastRadius: 95 }
+    sanctuary: { name: 'Void Field', color: '#00ffff', description: '範囲内の敵に継続ダメージを与える。', attackPower: 1.5, range: 110, cooldown: 12 },
+    laser: { name: 'Railgun', color: '#ff0000', description: '一直線上の敵を貫通するレーザー。', attackPower: 20, range: 480, cooldown: 35 },
+    bomb: { name: 'Plasma Grenade', color: '#ff8800', description: '爆発するグレネードを投げる。', attackPower: 40, range: 250, cooldown: 60, explosionRadius: 100 },
+    thunder: { name: 'Tesla Coil', color: '#ffff88', description: '敵に連鎖する雷を放つ。', attackPower: 22, range: 360, cooldown: 45, chainCount: 4 },
+    mine: { name: 'Spider Mine', color: '#ffff00', description: '敵を追尾する地雷を設置する。', attackPower: 35, range: 80, cooldown: 65, duration: 400, blastRadius: 95 }
 };
 
 // Deep clone for actual use
