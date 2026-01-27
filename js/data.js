@@ -6,7 +6,7 @@ const enemyTypes = {
 };
 
 const weaponsInitial = {
-    gun: { name: 'Plasma Gun', color: '#ffff00', description: '最も近い敵を自動で攻撃する。', attackPower: 12, range: 320, cooldown: 15 },
+    gun: { name: 'Plasma Gun', color: '#ffff00', description: '最も近い敵を自動で攻撃する。', attackPower: 14, range: 320, cooldown: 25 },
     scatter: { name: 'Scatter Shot', color: '#ffaa00', description: '近距離に拡散弾を発射する。', attackPower: 9, range: 180, cooldown: 30, count: 5, spread: 0.6 },
     whip: { name: 'Nano Whip', color: '#ff00ff', description: '左右両方を同時に攻撃する。', attackPower: 45, range: 180, cooldown: 35 },
     blade: { name: 'Photon Blade', color: '#00ffaa', description: '自機の周囲を回転するプラズマブレード。', attackPower: 25, range: 100, cooldown: 0, count: 1, rotSpeed: 0.08 },
