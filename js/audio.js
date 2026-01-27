@@ -15,7 +15,17 @@ class SoundManager {
 
         // Music Pattern
         this.normalBass = [36, 0, 36, 0, 36, 36, 38, 0, 33, 0, 33, 0, 33, 33, 35, 0];
+
         this.normalArp = [60, 63, 67, 63, 60, 63, 67, 63, 57, 60, 64, 60, 57, 60, 64, 60];
+
+        // Rare Alternate Pattern (F - G - Em - Am feel)
+        this.normalBassAlt = [41, 0, 41, 41, 43, 0, 43, 43, 40, 0, 40, 40, 33, 0, 33, 33];
+        this.normalArpAlt = [65, 69, 72, 69, 67, 71, 74, 71, 64, 67, 71, 67, 57, 60, 64, 60];
+        
+        this.isAlternatePhrase = false;
+        this.phraseCounter = 0;
+        this.targetNormalLoops = Math.floor(Math.random() * 9) + 8; // 8 - 16
+        this.targetRareLoops = 4;   // Fixed 4 loops
 
         // Boss Pattern (Faster, more aggressive)
         this.bossBass = [36, 36, 36, 36, 39, 39, 38, 38, 36, 36, 36, 36, 33, 33, 35, 35];
@@ -132,7 +142,10 @@ class SoundManager {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(this.isBossMode ? 900 : 800, t);
+        osc.type = 'triangle';
+        // Add random pitch variation (detune) for natural feel
+        const detune = 1.0 + (Math.random() * 0.1 - 0.05);
+        osc.frequency.setValueAtTime((this.isBossMode ? 900 : 800) * detune, t);
         osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
         gain.gain.setValueAtTime(0.2, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
@@ -147,7 +160,10 @@ class SoundManager {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, t);
+        osc.type = 'sawtooth';
+        
+        const detune = 1.0 + (Math.random() * 0.2 - 0.1);
+        osc.frequency.setValueAtTime(150 * detune, t);
         osc.frequency.exponentialRampToValueAtTime(10, t + 0.2);
 
         gain.gain.setValueAtTime(0.3, t);
@@ -249,7 +265,10 @@ class SoundManager {
         noise.buffer = this.createNoiseBuffer(0.4);
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(500, t);
+        filter.type = 'lowpass';
+        
+        const detune = 1.0 + (Math.random() * 0.2 - 0.1);
+        filter.frequency.setValueAtTime(500 * detune, t);
         filter.frequency.linearRampToValueAtTime(10, t + 0.3);
         const gain = this.ctx.createGain();
         gain.gain.setValueAtTime(0.5, t);
@@ -313,6 +332,8 @@ class SoundManager {
         osc.start(t); osc.stop(t + Math.random() * 0.1);
     }
 
+
+
     playGameOver() {
         const t = this.soundTime(true);
         if (t == null) return;
@@ -365,8 +386,8 @@ class SoundManager {
             noise.start(time);
         }
 
-        const bassLine = this.isBossMode ? this.bossBass : this.normalBass;
-        const arpLine = this.isBossMode ? this.bossArp : this.normalArp;
+        const bassLine = this.isBossMode ? this.bossBass : (this.isAlternatePhrase ? this.normalBassAlt : this.normalBass);
+        const arpLine = this.isBossMode ? this.bossArp : (this.isAlternatePhrase ? this.normalArpAlt : this.normalArp);
 
         const bassNote = bassLine[beat % 16];
         if (bassNote) {
@@ -397,6 +418,32 @@ class SoundManager {
             this.scheduleNote(this.current16thNote, this.nextNoteTime);
             this.nextNoteTime += 0.25 * (60.0 / this.tempo);
             this.current16thNote = (this.current16thNote + 1) % 16;
+            
+            // Handle Phrase Loop Logic
+            if (this.current16thNote === 0) {
+                this.phraseCounter++;
+                
+                if (!this.isBossMode) {
+                    if (!this.isAlternatePhrase) {
+                        // Current: Normal phrase
+                        if (this.phraseCounter >= this.targetNormalLoops) {
+                            this.isAlternatePhrase = true;
+                            this.phraseCounter = 0;
+                            this.targetRareLoops = 4; // Fixed 4 loops
+                        }
+                    } else {
+                        // Current: Rare phrase
+                        if (this.phraseCounter >= this.targetRareLoops) {
+                            this.isAlternatePhrase = false;
+                            this.phraseCounter = 0;
+                            this.targetNormalLoops = Math.floor(Math.random() * 9) + 8; // 8 - 16
+                        }
+                    }
+                } else {
+                    this.isAlternatePhrase = false;
+                    this.phraseCounter = 0;
+                }
+            }
         }
         this.timerID = window.setTimeout(() => this.scheduler(), 25);
     }
