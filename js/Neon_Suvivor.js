@@ -713,12 +713,35 @@ function updatePlayer() {
 }
 
 function findNearest(range) {
-    let t = null, md = range;
+    let nearestEnemy = null;
+    let minEnemyDist = range;
+    
+    let nearestBoss = null;
+    let minBossDist = range;
+
     enemies.forEach(e => {
         const d = Math.hypot(e.x - player.x, e.y - player.y);
-        if (d < md) { md = d; t = e; }
+        
+        // Ensure within range (and consider enemy size for edge-to-edge detection if desired, 
+        // but center-to-center is standard for simple checks. 
+        // We stick to range limit logic provided.)
+        
+        if (e.isBoss) {
+            if (d < minBossDist) {
+                minBossDist = d;
+                nearestBoss = e;
+            }
+        } else {
+            if (d < minEnemyDist) {
+                minEnemyDist = d;
+                nearestEnemy = e;
+            }
+        }
     });
-    return t;
+
+    // Prioritize Boss if within range
+    if (nearestBoss) return nearestBoss;
+    return nearestEnemy;
 }
 
 function pointLineDist(px, py, x1, y1, x2, y2) {
