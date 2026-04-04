@@ -114,7 +114,6 @@ function handleViewportResize() {
 
 startBtn.addEventListener('click', () => {
     soundManager.init();
-    soundManager.startBGM();
     overlay.style.display = 'none';
     ui.style.display = 'flex';
     audioContainer.style.display = 'block';
@@ -124,6 +123,7 @@ startBtn.addEventListener('click', () => {
     }
     gameState = "playing";
     resetGame();
+    soundManager.startBGM();
     if (!isAnimating) {
         isAnimating = true;
         animate();
@@ -137,316 +137,11 @@ neuralBtn.addEventListener('click', () => {
     soundManager.init();
     overlay.style.display = 'none';
     ui.style.display = 'none';
-    audioContainer.style.display = 'none';
-    touchControls.style.display = 'none';
-    gameState = "meta";
-    if (!isAnimating) {
-        isAnimating = true;
-        animate();
-    }
-});
-
-muteBtn.addEventListener('click', () => {
-    const muted = soundManager.toggleMute();
-    muteBtn.innerText = muted ? "🔇 MUTED" : "🔊 MUTE";
-    audioToggle.innerText = muted ? "🔇" : "🔊";
-});
-
-volumeSlider.addEventListener('input', () => {
-    const vol = volumeSlider.value / 100;
-    soundManager.setVolume(vol);
-    volumeValue.innerText = `${volumeSlider.value}%`;
-});
-
-let isAudioPanelOpen = false;
-
-function setAudioPanel(open) {
-    isAudioPanelOpen = open;
-    audioContainer.classList.toggle('open', open);
-    audioToggle.setAttribute('aria-expanded', open);
-    audioPanel.setAttribute('aria-hidden', !open);
-}
-
-audioToggle.addEventListener('click', (event) => {
-    event.stopPropagation();
-    setAudioPanel(!isAudioPanelOpen);
-});
-
-document.addEventListener('click', (event) => {
-    if (!isAudioPanelOpen) return;
-    if (audioContainer.contains(event.target)) return;
-    setAudioPanel(false);
-});
-
-let gameState = "start";
-let score = 0;
-let totalDamageDealt = 0;
-let wave = 1;
-let frameCount = 0;
-let timeSeconds = 0;
-let isBossActive = false;
-let enemyGlobalHpMul = 1;
-
-// Delta-time for frame-rate independence
-const MAX_DT = 0.25; // Max 250ms to prevent huge jumps on tab resume
-let lastTimestamp = 0;
-let dtSeconds = 0;
-let dtFrames = 0;
-let spawnAccumulator = 0; // Time accumulator for spawning
-let isAnimating = false;
-let hoveredMetaUpgradeId = null;
-let metaClickAreas = { cards: [], back: null, deploy: null };
-let lastRunShardsEarned = 0;
-let lastRunWasNewRecord = false;
-let lastRunRecordId = null;
-
-function createDefaultMetaData() {
-    const upgradesData = {};
-    metaUpgradeDefs.forEach(def => {
-        upgradesData[def.id] = 0;
-    });
-    return {
-        shards: 0,
-        totalRuns: 0,
-        upgrades: upgradesData
-    };
-}
-
-function loadMetaData() {
-    const fallback = createDefaultMetaData();
-    const raw = localStorage.getItem(META_STORAGE_KEY);
-    if (!raw) return fallback;
-
-    try {
-        const parsed = JSON.parse(raw);
-        const merged = {
-            shards: Number.isFinite(parsed?.shards) ? Math.max(0, Math.floor(parsed.shards)) : 0,
-            totalRuns: Number.isFinite(parsed?.totalRuns) ? Math.max(0, Math.floor(parsed.totalRuns)) : 0,
-            upgrades: { ...fallback.upgrades }
-        };
-        if (parsed && parsed.upgrades && typeof parsed.upgrades === 'object') {
-            metaUpgradeDefs.forEach(def => {
-                const value = parsed.upgrades[def.id];
-                const normalized = Number.isFinite(value) ? Math.floor(value) : 0;
-                merged.upgrades[def.id] = clamp(normalized, 0, def.maxLevel);
-            });
-        }
-        return merged;
-    } catch (_) {
-        return fallback;
-    }
-}
-
-function saveMetaData(metaData) {
-    localStorage.setItem(META_STORAGE_KEY, JSON.stringify(metaData));
-}
-
-function applyMetaUpgrades() {
-    const meta = loadMetaData();
-    const u = meta.upgrades;
-
-    player.maxHp += (u.startHp || 0) * 15;
-    player.hp = player.maxHp;
-
-    // Apply persistent meta upgrades as permanent base modifiers
-    const atkMult = 1 + (u.attackPower || 0) * 0.05;
-    Object.keys(weapons).forEach(k => {
-        weapons[k].attackPower *= atkMult; // persistent base multiplier
-    });
-
-    player.speed *= 1 + (u.moveSpeed || 0) * 0.04; // persistent base speed multiplier
-
-    const cdrMult = Math.pow(0.95, (u.cooldown || 0));
-    Object.keys(weapons).forEach(k => {
-        weapons[k].cooldown *= cdrMult; // persistent base cooldown multiplier
-    });
-
-    // These are persistent base increases for session to build on
-    player.expMult += (u.expGain || 0) * 0.10;
-    player.magnetRadius *= 1 + (u.magnetRange || 0) * 0.15;
-    player.damageReduction = clamp(player.damageReduction + (u.armor || 0) * 0.05, 0, 0.8);
-    player.healOnWave = (u.healOnWave || 0) * 8;
-    player.gemExpBonus = (u.gemBonus || 0) * 0.12;
-
-    // Ensure session modifiers that should stack with persistent base are kept (e.g., speedMul already applied multiplicatively in session)
-}
-
-function pointInRect(x, y, rect) {
-    return !!rect && x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
-}
-
-function getMetaLayout() {
-    const isPortrait = cssWidth < cssHeight;
-    const margin = clamp(cssWidth * 0.04, 16, 42);
-    let cols = isPortrait ? 2 : 5;
-    let gap = isPortrait ? 12 : 14;
-    let topY = isPortrait ? 150 : 130;
-
-    let cardW = (cssWidth - margin * 2 - (cols - 1) * gap) / cols;
-    cardW = clamp(cardW, 120, 220);
-    let cardH = cardW * 1.12;
-
-    let rows = Math.ceil(metaUpgradeDefs.length / cols);
-    const maxCardsHeight = cssHeight - topY - 120;
-    let usedCardsHeight = rows * cardH + (rows - 1) * gap;
-    if (usedCardsHeight > maxCardsHeight) {
-        const scale = maxCardsHeight / usedCardsHeight;
-        cardW *= scale;
-        cardH *= scale;
-        gap *= scale;
-        usedCardsHeight = rows * cardH + (rows - 1) * gap;
-    }
-
-    const totalW = cols * cardW + (cols - 1) * gap;
-    const startX = (cssWidth - totalW) / 2;
-    const cards = metaUpgradeDefs.map((def, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        return {
-            def,
-            x: startX + col * (cardW + gap),
-            y: topY + row * (cardH + gap),
-            w: cardW,
-            h: cardH
-        };
-    });
-
-    const backW = clamp(88, cssWidth * 0.14, 140);
-    const backH = clamp(34, cssHeight * 0.055, 44);
-    const back = { x: cssWidth - margin - backW, y: margin * 0.7, w: backW, h: backH };
-
-    const deployW = clamp(170, cssWidth * 0.32, 320);
-    const deployH = clamp(42, cssHeight * 0.065, 56);
-    const deploy = {
-        x: (cssWidth - deployW) / 2,
-        y: Math.min(cssHeight - deployH - margin * 0.8, topY + usedCardsHeight + 16),
-        w: deployW,
-        h: deployH
-    };
-
-    return { cards, back, deploy, isPortrait };
-}
-
-function drawMetaScreen() {
-    const meta = loadMetaData();
-    const layout = getMetaLayout();
-    metaClickAreas = layout;
-
-    ctx.fillStyle = 'rgba(4, 8, 18, 0.95)';
-    ctx.fillRect(0, 0, cssWidth, cssHeight);
-
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#4dd6ff';
-    ctx.font = `900 ${clamp(24, cssWidth * 0.04, 42)}px 'Courier New'`;
-    ctx.fillText('NEURAL UPGRADES', clamp(cssWidth * 0.04, 20, 50), clamp(cssHeight * 0.08, 34, 64));
-
-    ctx.fillStyle = '#9ce89c';
-    ctx.font = `bold ${clamp(14, cssWidth * 0.02, 22)}px 'Segoe UI'`;
-    ctx.fillText(`TOTAL SHARDS: ${meta.shards} ✦`, clamp(cssWidth * 0.04, 20, 50), clamp(cssHeight * 0.13, 70, 106));
-
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillRect(layout.back.x, layout.back.y, layout.back.w, layout.back.h);
-    ctx.strokeStyle = '#66aacc';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(layout.back.x, layout.back.y, layout.back.w, layout.back.h);
-    ctx.fillStyle = '#d8f7ff';
-    ctx.textAlign = 'center';
-    ctx.font = `bold ${clamp(12, cssWidth * 0.016, 18)}px 'Segoe UI'`;
-    ctx.fillText('< BACK', layout.back.x + layout.back.w / 2, layout.back.y + layout.back.h * 0.65);
-
-    layout.cards.forEach(card => {
-        const def = card.def;
-        const level = meta.upgrades[def.id] || 0;
-        const maxed = level >= def.maxLevel;
-        const cost = maxed ? null : def.costs[level];
-        const canBuy = !maxed && meta.shards >= cost;
-        const isHover = hoveredMetaUpgradeId === def.id;
-
-        const grad = ctx.createLinearGradient(card.x, card.y, card.x, card.y + card.h);
-        grad.addColorStop(0, '#182435');
-        grad.addColorStop(1, '#0f1624');
-        ctx.fillStyle = grad;
-        ctx.fillRect(card.x, card.y, card.w, card.h);
-
-        ctx.strokeStyle = isHover ? '#ffaa00' : '#2f7ea0';
-        ctx.lineWidth = isHover ? 3 : 2;
-        ctx.strokeRect(card.x, card.y, card.w, card.h);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'left';
-        ctx.font = `bold ${clamp(10, card.w * 0.09, 15)}px 'Segoe UI'`;
-        ctx.fillText(def.name, card.x + card.w * 0.06, card.y + card.h * 0.18);
-
-        const barX = card.x + card.w * 0.06;
-        const barY = card.y + card.h * 0.30;
-        const barW = card.w * 0.88;
-        const barH = clamp(8, card.h * 0.06, 12);
-        ctx.fillStyle = '#1f2f44';
-        ctx.fillRect(barX, barY, barW, barH);
-        ctx.fillStyle = '#00d9ff';
-        ctx.fillRect(barX, barY, barW * (level / def.maxLevel), barH);
-
-        ctx.fillStyle = '#b8cfe0';
-        ctx.font = `${clamp(10, card.w * 0.08, 13)}px 'Courier New'`;
-        ctx.fillText(`LV ${level}/${def.maxLevel}`, card.x + card.w * 0.06, card.y + card.h * 0.46);
-
-        ctx.fillStyle = '#8ca2b3';
-        ctx.font = `${clamp(10, card.w * 0.075, 12)}px 'Segoe UI'`;
-        wrapText(ctx, def.description, card.x + card.w * 0.06, card.y + card.h * 0.60, card.w * 0.88, clamp(11, card.h * 0.08, 14));
-
-        const btnX = card.x + card.w * 0.06;
-        const btnW = card.w * 0.88;
-        const btnH = clamp(20, card.h * 0.15, 28);
-        const btnY = card.y + card.h - btnH - card.h * 0.08;
-
-        ctx.fillStyle = maxed ? '#775a00' : (canBuy ? '#0b693f' : '#3b3b3b');
-        ctx.fillRect(btnX, btnY, btnW, btnH);
-        ctx.strokeStyle = maxed ? '#ffcc55' : (canBuy ? '#40f5a0' : '#666');
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(btnX, btnY, btnW, btnH);
-        ctx.fillStyle = maxed ? '#ffd56a' : (canBuy ? '#d8ffec' : '#a2a2a2');
-        ctx.textAlign = 'center';
-        ctx.font = `bold ${clamp(9, card.w * 0.075, 12)}px 'Courier New'`;
-        ctx.fillText(maxed ? 'MAXED' : `UPGRADE: ${cost}✦`, btnX + btnW / 2, btnY + btnH * 0.67);
-    });
-
-    ctx.fillStyle = 'rgba(0, 85, 50, 0.5)';
-    ctx.fillRect(layout.deploy.x, layout.deploy.y, layout.deploy.w, layout.deploy.h);
-    ctx.strokeStyle = '#31ffa8';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(layout.deploy.x, layout.deploy.y, layout.deploy.w, layout.deploy.h);
-    ctx.fillStyle = '#c9ffea';
-    ctx.textAlign = 'center';
-    ctx.font = `bold ${clamp(14, cssWidth * 0.022, 24)}px 'Courier New'`;
-    ctx.fillText('DEPLOY SYSTEM >', layout.deploy.x + layout.deploy.w / 2, layout.deploy.y + layout.deploy.h * 0.66);
-}
-
-function tryPurchaseMetaUpgrade(upgradeId) {
-    const def = metaUpgradeDefs.find(m => m.id === upgradeId);
-    if (!def) return;
-
-    const meta = loadMetaData();
-    const level = meta.upgrades[upgradeId] || 0;
-    if (level >= def.maxLevel) return;
-
-    const cost = def.costs[level];
-    if (meta.shards < cost) return;
-
-    meta.shards -= cost;
-    meta.upgrades[upgradeId] = level + 1;
-    saveMetaData(meta);
-    soundManager.playLevelUp();
-}
-
-function handleMetaClick(clickX, clickY) {
-    if (pointInRect(clickX, clickY, metaClickAreas.back)) {
-        overlay.style.display = 'flex';
-        ui.style.display = 'none';
         audioContainer.style.display = 'none';
         touchControls.style.display = 'none';
+        soundManager.stopBGM();
         gameState = 'start';
-        return;
-    }
+    
 
     if (pointInRect(clickX, clickY, metaClickAreas.deploy)) {
         overlay.style.display = 'none';
@@ -800,6 +495,8 @@ let enemyBaseHp = 10;
 let spawnRate = 60;
 
 function resetGame() {
+    soundManager.stopBGM();
+    
     weapons = JSON.parse(JSON.stringify(weaponsInitial));
 
     lastTimestamp = 0; // Reset delta-time tracking

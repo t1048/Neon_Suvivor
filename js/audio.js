@@ -88,6 +88,18 @@ class SoundManager {
         }
     }
 
+    stopBGM() {
+        if (this.timerID) {
+            clearTimeout(this.timerID);
+            this.timerID = null;
+        }
+        this.isPlayingBGM = false;
+        this.current16thNote = 0;
+        this.nextNoteTime = 0;
+        this.isAlternatePhrase = false;
+        this.phraseCounter = 0;
+    }
+
     triggerOverheatSequence() {
         if (this.isOverheating || this.isSystemError) return;
         this.isOverheating = true;
