@@ -21,41 +21,44 @@ const weaponsInitial = {
 let weapons = JSON.parse(JSON.stringify(weaponsInitial));
 
 const upgrades = [
-    { id: 'atk', name: 'Power Up', description: '攻撃力+20%', apply: () => player.weapons.forEach(k => weapons[k].attackPower *= 1.2) },
-    { id: 'spd', name: 'Agility', description: '移動速度+10%', apply: () => player.speed *= 1.1 },
-    { id: 'hp', name: 'Vitality', description: '最大HP+20＆全回復', apply: () => { player.maxHp += 20; player.hp = player.maxHp; } },
+    { id: 'atk', name: 'Power Up', description: '攻撃力+20%', apply: () => {
+        // session multiplicative buff to weapons' attack
+        playerSessionMods.weaponsApplyForEach(k => { playerSessionMods.weapons[k].attackMul *= 1.20; });
+        addFloatingText(player.x, player.y, 'ATK +20%', '#ffccaa');
+    } },
+    { id: 'spd', name: 'Agility', description: '移動速度+10%', apply: () => {
+        playerSessionMods.player.speedMul *= 1.10; addFloatingText(player.x, player.y, 'SPEED +10%', '#aaffff');
+    } },
+    { id: 'hp', name: 'Vitality', description: '最大HP+20＆全回復', apply: () => {
+        playerSessionMods.player.maxHpAdd += 20; player.hp = Math.min(player.maxHp + playerSessionMods.player.maxHpAdd, player.hp + 20); addFloatingText(player.x, player.y, '+20 HP', '#ff8888');
+    } },
     {
         id: 'cdr',
         name: 'Overclock',
         description: 'クールダウン-10%',
-        apply: () => player.weapons.forEach(k => {
-            const w = weapons[k];
-            w.cooldown *= 0.9;
-            if (w.rotSpeed) w.rotSpeed /= 0.9; // tie blade speed to cooldown buffs
-        })
+        apply: () => {
+            playerSessionMods.weaponsApplyForEach(k => { playerSessionMods.weapons[k].cooldownMul *= 0.9; });
+            addFloatingText(player.x, player.y, 'CDR -10%', '#ffeeaa');
+        }
     },
     {
         id: 'rng',
         name: 'Scope',
         description: '射程+20%、爆発範囲+10%',
         apply: () => {
-            player.weapons.forEach(k => {
-                weapons[k].range *= 1.20;
-                if (weapons[k].explosionRadius) weapons[k].explosionRadius *= 1.10;
-                if (weapons[k].blastRadius) weapons[k].blastRadius *= 1.10;
-            });
+            playerSessionMods.weaponsApplyForEach(k => { playerSessionMods.weapons[k].rangeMul *= 1.20; playerSessionMods.weapons[k].explosionMul *= 1.10; playerSessionMods.weapons[k].blastMul *= 1.10; });
             addFloatingText(player.x, player.y, 'SCOPE UP!', '#00ffff');
         }
     },
-    { id: 'mag', name: 'Magnet', description: 'アイテム吸収範囲+30%', apply: () => player.magnetRadius *= 1.3 },
-    { id: 'exp', name: 'Learning', description: '獲得経験値+12%', apply: () => player.expMult += 0.12 },
+    { id: 'mag', name: 'Magnet', description: 'アイテム吸収範囲+30%', apply: () => { playerSessionMods.player.magnetMul *= 1.3; addFloatingText(player.x, player.y, 'MAGNET +30%', '#aaffaa'); } },
+    { id: 'exp', name: 'Learning', description: '獲得経験値+12%', apply: () => { playerSessionMods.player.expMulAdd += 0.12; addFloatingText(player.x, player.y, '+12% EXP', '#ffd2ff'); } },
     {
         id: 'curse',
         name: 'Cursed Sigil',
         description: '敵HP+30%、獲得経験値+50%',
         apply: () => {
             enemyGlobalHpMul *= 1.3;
-            player.expMult += 0.5;
+            playerSessionMods.player.expMulAdd += 0.5;
             addFloatingText(player.x, player.y, "CURSED!", "#8800ff");
         }
     },
@@ -82,12 +85,25 @@ const upgrades = [
         name: 'Fortress',
         description: '被ダメージ減少、移動速度低下',
         apply: () => {
-            player.damageReduction += 0.15; // 15% reduction
-            player.speed *= 0.9; // 10% slow
+            playerSessionMods.player.damageReductionAdd += 0.15; // 15% reduction additive
+            playerSessionMods.player.speedMul *= 0.9; // 10% slow
             addFloatingText(player.x, player.y, "ARMOR UP!", "#888888");
         }
     }
 ];
 
-const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
+const metaUpgradeDefs = [
+    { id: 'startHp', name: 'AUGMENTED BODY', description: '開始HP +15', maxLevel: 5, costs: [20, 40, 70, 110, 160] },
+    { id: 'attackPower', name: 'NEURAL AMP', description: '全武器攻撃力 +5%', maxLevel: 5, costs: [20, 40, 70, 110, 160] },
+    { id: 'moveSpeed', name: 'SERVO LEGS', description: '移動速度 +4%', maxLevel: 5, costs: [20, 40, 70, 110, 160] },
+    { id: 'cooldown', name: 'OVERCLOCK CHIP', description: '武器クールダウン -5%', maxLevel: 5, costs: [20, 40, 70, 110, 160] },
+    { id: 'expGain', name: 'SYNAPTIC BOOST', description: '獲得経験値 +10%', maxLevel: 5, costs: [15, 30, 50, 80, 120] },
+    { id: 'magnetRange', name: 'GRAVITY COIL', description: '磁力範囲 +15%', maxLevel: 5, costs: [15, 30, 50, 80, 120] },
+    { id: 'armor', name: 'NANOWEAVE', description: '被ダメージ -5%', maxLevel: 5, costs: [25, 50, 85, 130, 190] },
+    { id: 'healOnWave', name: 'REGEN MATRIX', description: 'Wave突破時HP +8', maxLevel: 3, costs: [30, 65, 110] },
+    { id: 'gemBonus', name: 'DATA EXTRACTOR', description: 'ジェムEXP +12%', maxLevel: 3, costs: [25, 55, 100] },
+    { id: 'shardGain', name: 'HARVEST PROTOCOL', description: '取得シャード +20%', maxLevel: 3, costs: [20, 45, 80] }
+];
+
+const clamp = (v, min, max) => Math.min(Math.max(v, min), max);

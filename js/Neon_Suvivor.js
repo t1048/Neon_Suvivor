@@ -52,6 +52,7 @@ window.addEventListener('orientationchange', handleViewportResize);
 
 // UI
 const startBtn = document.getElementById('startBtn');
+const neuralBtn = document.getElementById('neuralBtn');
 const overlay = document.getElementById('overlay');
 const ui = document.getElementById('ui');
 const muteBtn = document.getElementById('muteBtn');
@@ -63,6 +64,8 @@ const audioControls = document.getElementById('audioControls');
 const volumeSlider = document.getElementById('volumeSlider');
 const volumeValue = document.getElementById('volumeValue');
 const gameSubtitle = document.getElementById('gameSubtitle');
+
+const META_STORAGE_KEY = 'neonSurvivorMeta';
 
 const initialVolume = Math.round(soundManager.masterVolume * 100);
 volumeSlider.value = initialVolume;
@@ -121,10 +124,26 @@ startBtn.addEventListener('click', () => {
     }
     gameState = "playing";
     resetGame();
-    animate();
+    if (!isAnimating) {
+        isAnimating = true;
+        animate();
+    }
     
     // Hide address bar on mobile devices
     hideAddressBar();
+});
+
+neuralBtn.addEventListener('click', () => {
+    soundManager.init();
+    overlay.style.display = 'none';
+    ui.style.display = 'none';
+    audioContainer.style.display = 'none';
+    touchControls.style.display = 'none';
+    gameState = "meta";
+    if (!isAnimating) {
+        isAnimating = true;
+        animate();
+    }
 });
 
 muteBtn.addEventListener('click', () => {
@@ -174,6 +193,293 @@ let lastTimestamp = 0;
 let dtSeconds = 0;
 let dtFrames = 0;
 let spawnAccumulator = 0; // Time accumulator for spawning
+let isAnimating = false;
+let hoveredMetaUpgradeId = null;
+let metaClickAreas = { cards: [], back: null, deploy: null };
+let lastRunShardsEarned = 0;
+let lastRunWasNewRecord = false;
+let lastRunRecordId = null;
+
+function createDefaultMetaData() {
+    const upgradesData = {};
+    metaUpgradeDefs.forEach(def => {
+        upgradesData[def.id] = 0;
+    });
+    return {
+        shards: 0,
+        totalRuns: 0,
+        upgrades: upgradesData
+    };
+}
+
+function loadMetaData() {
+    const fallback = createDefaultMetaData();
+    const raw = localStorage.getItem(META_STORAGE_KEY);
+    if (!raw) return fallback;
+
+    try {
+        const parsed = JSON.parse(raw);
+        const merged = {
+            shards: Number.isFinite(parsed?.shards) ? Math.max(0, Math.floor(parsed.shards)) : 0,
+            totalRuns: Number.isFinite(parsed?.totalRuns) ? Math.max(0, Math.floor(parsed.totalRuns)) : 0,
+            upgrades: { ...fallback.upgrades }
+        };
+        if (parsed && parsed.upgrades && typeof parsed.upgrades === 'object') {
+            metaUpgradeDefs.forEach(def => {
+                const value = parsed.upgrades[def.id];
+                const normalized = Number.isFinite(value) ? Math.floor(value) : 0;
+                merged.upgrades[def.id] = clamp(normalized, 0, def.maxLevel);
+            });
+        }
+        return merged;
+    } catch (_) {
+        return fallback;
+    }
+}
+
+function saveMetaData(metaData) {
+    localStorage.setItem(META_STORAGE_KEY, JSON.stringify(metaData));
+}
+
+function applyMetaUpgrades() {
+    const meta = loadMetaData();
+    const u = meta.upgrades;
+
+    player.maxHp += (u.startHp || 0) * 15;
+    player.hp = player.maxHp;
+
+    // Apply persistent meta upgrades as permanent base modifiers
+    const atkMult = 1 + (u.attackPower || 0) * 0.05;
+    Object.keys(weapons).forEach(k => {
+        weapons[k].attackPower *= atkMult; // persistent base multiplier
+    });
+
+    player.speed *= 1 + (u.moveSpeed || 0) * 0.04; // persistent base speed multiplier
+
+    const cdrMult = Math.pow(0.95, (u.cooldown || 0));
+    Object.keys(weapons).forEach(k => {
+        weapons[k].cooldown *= cdrMult; // persistent base cooldown multiplier
+    });
+
+    // These are persistent base increases for session to build on
+    player.expMult += (u.expGain || 0) * 0.10;
+    player.magnetRadius *= 1 + (u.magnetRange || 0) * 0.15;
+    player.damageReduction = clamp(player.damageReduction + (u.armor || 0) * 0.05, 0, 0.8);
+    player.healOnWave = (u.healOnWave || 0) * 8;
+    player.gemExpBonus = (u.gemBonus || 0) * 0.12;
+
+    // Ensure session modifiers that should stack with persistent base are kept (e.g., speedMul already applied multiplicatively in session)
+}
+
+function pointInRect(x, y, rect) {
+    return !!rect && x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+}
+
+function getMetaLayout() {
+    const isPortrait = cssWidth < cssHeight;
+    const margin = clamp(cssWidth * 0.04, 16, 42);
+    let cols = isPortrait ? 2 : 5;
+    let gap = isPortrait ? 12 : 14;
+    let topY = isPortrait ? 150 : 130;
+
+    let cardW = (cssWidth - margin * 2 - (cols - 1) * gap) / cols;
+    cardW = clamp(cardW, 120, 220);
+    let cardH = cardW * 1.12;
+
+    let rows = Math.ceil(metaUpgradeDefs.length / cols);
+    const maxCardsHeight = cssHeight - topY - 120;
+    let usedCardsHeight = rows * cardH + (rows - 1) * gap;
+    if (usedCardsHeight > maxCardsHeight) {
+        const scale = maxCardsHeight / usedCardsHeight;
+        cardW *= scale;
+        cardH *= scale;
+        gap *= scale;
+        usedCardsHeight = rows * cardH + (rows - 1) * gap;
+    }
+
+    const totalW = cols * cardW + (cols - 1) * gap;
+    const startX = (cssWidth - totalW) / 2;
+    const cards = metaUpgradeDefs.map((def, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        return {
+            def,
+            x: startX + col * (cardW + gap),
+            y: topY + row * (cardH + gap),
+            w: cardW,
+            h: cardH
+        };
+    });
+
+    const backW = clamp(88, cssWidth * 0.14, 140);
+    const backH = clamp(34, cssHeight * 0.055, 44);
+    const back = { x: cssWidth - margin - backW, y: margin * 0.7, w: backW, h: backH };
+
+    const deployW = clamp(170, cssWidth * 0.32, 320);
+    const deployH = clamp(42, cssHeight * 0.065, 56);
+    const deploy = {
+        x: (cssWidth - deployW) / 2,
+        y: Math.min(cssHeight - deployH - margin * 0.8, topY + usedCardsHeight + 16),
+        w: deployW,
+        h: deployH
+    };
+
+    return { cards, back, deploy, isPortrait };
+}
+
+function drawMetaScreen() {
+    const meta = loadMetaData();
+    const layout = getMetaLayout();
+    metaClickAreas = layout;
+
+    ctx.fillStyle = 'rgba(4, 8, 18, 0.95)';
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#4dd6ff';
+    ctx.font = `900 ${clamp(24, cssWidth * 0.04, 42)}px 'Courier New'`;
+    ctx.fillText('NEURAL UPGRADES', clamp(cssWidth * 0.04, 20, 50), clamp(cssHeight * 0.08, 34, 64));
+
+    ctx.fillStyle = '#9ce89c';
+    ctx.font = `bold ${clamp(14, cssWidth * 0.02, 22)}px 'Segoe UI'`;
+    ctx.fillText(`TOTAL SHARDS: ${meta.shards} ✦`, clamp(cssWidth * 0.04, 20, 50), clamp(cssHeight * 0.13, 70, 106));
+
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(layout.back.x, layout.back.y, layout.back.w, layout.back.h);
+    ctx.strokeStyle = '#66aacc';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(layout.back.x, layout.back.y, layout.back.w, layout.back.h);
+    ctx.fillStyle = '#d8f7ff';
+    ctx.textAlign = 'center';
+    ctx.font = `bold ${clamp(12, cssWidth * 0.016, 18)}px 'Segoe UI'`;
+    ctx.fillText('< BACK', layout.back.x + layout.back.w / 2, layout.back.y + layout.back.h * 0.65);
+
+    layout.cards.forEach(card => {
+        const def = card.def;
+        const level = meta.upgrades[def.id] || 0;
+        const maxed = level >= def.maxLevel;
+        const cost = maxed ? null : def.costs[level];
+        const canBuy = !maxed && meta.shards >= cost;
+        const isHover = hoveredMetaUpgradeId === def.id;
+
+        const grad = ctx.createLinearGradient(card.x, card.y, card.x, card.y + card.h);
+        grad.addColorStop(0, '#182435');
+        grad.addColorStop(1, '#0f1624');
+        ctx.fillStyle = grad;
+        ctx.fillRect(card.x, card.y, card.w, card.h);
+
+        ctx.strokeStyle = isHover ? '#ffaa00' : '#2f7ea0';
+        ctx.lineWidth = isHover ? 3 : 2;
+        ctx.strokeRect(card.x, card.y, card.w, card.h);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'left';
+        ctx.font = `bold ${clamp(10, card.w * 0.09, 15)}px 'Segoe UI'`;
+        ctx.fillText(def.name, card.x + card.w * 0.06, card.y + card.h * 0.18);
+
+        const barX = card.x + card.w * 0.06;
+        const barY = card.y + card.h * 0.30;
+        const barW = card.w * 0.88;
+        const barH = clamp(8, card.h * 0.06, 12);
+        ctx.fillStyle = '#1f2f44';
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.fillStyle = '#00d9ff';
+        ctx.fillRect(barX, barY, barW * (level / def.maxLevel), barH);
+
+        ctx.fillStyle = '#b8cfe0';
+        ctx.font = `${clamp(10, card.w * 0.08, 13)}px 'Courier New'`;
+        ctx.fillText(`LV ${level}/${def.maxLevel}`, card.x + card.w * 0.06, card.y + card.h * 0.46);
+
+        ctx.fillStyle = '#8ca2b3';
+        ctx.font = `${clamp(10, card.w * 0.075, 12)}px 'Segoe UI'`;
+        wrapText(ctx, def.description, card.x + card.w * 0.06, card.y + card.h * 0.60, card.w * 0.88, clamp(11, card.h * 0.08, 14));
+
+        const btnX = card.x + card.w * 0.06;
+        const btnW = card.w * 0.88;
+        const btnH = clamp(20, card.h * 0.15, 28);
+        const btnY = card.y + card.h - btnH - card.h * 0.08;
+
+        ctx.fillStyle = maxed ? '#775a00' : (canBuy ? '#0b693f' : '#3b3b3b');
+        ctx.fillRect(btnX, btnY, btnW, btnH);
+        ctx.strokeStyle = maxed ? '#ffcc55' : (canBuy ? '#40f5a0' : '#666');
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(btnX, btnY, btnW, btnH);
+        ctx.fillStyle = maxed ? '#ffd56a' : (canBuy ? '#d8ffec' : '#a2a2a2');
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${clamp(9, card.w * 0.075, 12)}px 'Courier New'`;
+        ctx.fillText(maxed ? 'MAXED' : `UPGRADE: ${cost}✦`, btnX + btnW / 2, btnY + btnH * 0.67);
+    });
+
+    ctx.fillStyle = 'rgba(0, 85, 50, 0.5)';
+    ctx.fillRect(layout.deploy.x, layout.deploy.y, layout.deploy.w, layout.deploy.h);
+    ctx.strokeStyle = '#31ffa8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(layout.deploy.x, layout.deploy.y, layout.deploy.w, layout.deploy.h);
+    ctx.fillStyle = '#c9ffea';
+    ctx.textAlign = 'center';
+    ctx.font = `bold ${clamp(14, cssWidth * 0.022, 24)}px 'Courier New'`;
+    ctx.fillText('DEPLOY SYSTEM >', layout.deploy.x + layout.deploy.w / 2, layout.deploy.y + layout.deploy.h * 0.66);
+}
+
+function tryPurchaseMetaUpgrade(upgradeId) {
+    const def = metaUpgradeDefs.find(m => m.id === upgradeId);
+    if (!def) return;
+
+    const meta = loadMetaData();
+    const level = meta.upgrades[upgradeId] || 0;
+    if (level >= def.maxLevel) return;
+
+    const cost = def.costs[level];
+    if (meta.shards < cost) return;
+
+    meta.shards -= cost;
+    meta.upgrades[upgradeId] = level + 1;
+    saveMetaData(meta);
+    soundManager.playLevelUp();
+}
+
+function handleMetaClick(clickX, clickY) {
+    if (pointInRect(clickX, clickY, metaClickAreas.back)) {
+        overlay.style.display = 'flex';
+        ui.style.display = 'none';
+        audioContainer.style.display = 'none';
+        touchControls.style.display = 'none';
+        gameState = 'start';
+        return;
+    }
+
+    if (pointInRect(clickX, clickY, metaClickAreas.deploy)) {
+        overlay.style.display = 'none';
+        ui.style.display = 'flex';
+        audioContainer.style.display = 'block';
+        if (isTouchDevice()) touchControls.style.display = 'block';
+        setAudioPanel(false);
+        gameState = 'playing';
+        resetGame();
+        soundManager.startBGM();
+        hideAddressBar();
+        return;
+    }
+
+    for (let i = 0; i < metaClickAreas.cards.length; i++) {
+        const card = metaClickAreas.cards[i];
+        if (pointInRect(clickX, clickY, card)) {
+            tryPurchaseMetaUpgrade(card.def.id);
+            return;
+        }
+    }
+}
+
+function handleMetaHover(mouseX, mouseY) {
+    hoveredMetaUpgradeId = null;
+    for (let i = 0; i < metaClickAreas.cards.length; i++) {
+        const card = metaClickAreas.cards[i];
+        if (pointInRect(mouseX, mouseY, card)) {
+            hoveredMetaUpgradeId = card.def.id;
+            break;
+        }
+    }
+}
 
 const keys = {};
 window.addEventListener('keydown', (e) => keys[e.key] = true);
@@ -290,17 +596,28 @@ canvas.addEventListener('touchstart', (e) => {
         }
     } else if (gameState === "gameover") {
         e.preventDefault();
-        resetGame();
-        gameState = "playing";
-        soundManager.startBGM();
+        overlay.style.display = 'flex';
+        ui.style.display = 'none';
+        audioContainer.style.display = 'none';
+        touchControls.style.display = 'none';
+        gameState = 'start';
+    } else if (gameState === "meta") {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const clickX = touch.clientX - rect.left;
+        const clickY = touch.clientY - rect.top;
+        handleMetaClick(clickX, clickY);
     }
 }, { passive: false });
 
 canvas.addEventListener('mousedown', (e) => {
     if (gameState === "gameover") {
-        resetGame();
-        gameState = "playing";
-        soundManager.startBGM();
+        overlay.style.display = 'flex';
+        ui.style.display = 'none';
+        audioContainer.style.display = 'none';
+        touchControls.style.display = 'none';
+        gameState = 'start';
     }
     else if (gameState === "levelup") {
         const rect = canvas.getBoundingClientRect();
@@ -321,6 +638,11 @@ canvas.addEventListener('mousedown', (e) => {
                 break;
             }
         }
+    } else if (gameState === "meta") {
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        handleMetaClick(clickX, clickY);
     }
 });
 
@@ -342,8 +664,14 @@ canvas.addEventListener('mousemove', (e) => {
                 break;
             }
         }
+    } else if (gameState === "meta") {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        handleMetaHover(mouseX, mouseY);
     } else {
         hoveredUpgradeIndex = -1;
+        hoveredMetaUpgradeId = null;
     }
 });
 
@@ -380,7 +708,9 @@ const player = {
     lastMoveAngle: 0,
     adrenaline: 0,
     vitalStrike: 0,
-    damageReduction: 0 // Fortress Skill
+    damageReduction: 0, // Fortress Skill
+    healOnWave: 0,
+    gemExpBonus: 0
 };
 
 const world = { width: 3000, height: 3000 };
@@ -392,6 +722,18 @@ let bossBullets = [];
 let rotatingBlades = [];
 let selectedUpgradeIndex = 0;
 let hoveredUpgradeIndex = -1;
+
+// Session-only modifiers for single-run buffs (separates base/persistent vs temporary session buffs)
+const playerSessionMods = {
+    player: { speedMul: 1, maxHpAdd: 0, magnetMul: 1, expMulAdd: 0, damageReductionAdd: 0 },
+    weapons: {},
+    weaponsApplyForEach: (fn) => { Object.keys(weapons).forEach(k => fn(k)); }
+};
+
+// Initialize default per-weapon session modifiers
+Object.keys(weapons).forEach(k => {
+    playerSessionMods.weapons[k] = { attackMul: 1, cooldownMul: 1, rangeMul: 1, explosionMul: 1, blastMul: 1 };
+});
 
 function getUpgradeLayout() {
     const isPortrait = cssWidth < cssHeight;
@@ -472,6 +814,8 @@ function resetGame() {
     player.adrenaline = 0;
     player.vitalStrike = 0;
     player.damageReduction = 0;
+    player.healOnWave = 0;
+    player.gemExpBonus = 0;
     enemyGlobalHpMul = 1;
 
     score = 0; wave = 1; frameCount = 0; timeSeconds = 0;
@@ -494,7 +838,13 @@ function resetGame() {
     player.weapons = [randomKey];
     player.weaponCooldowns = {};
     player.weaponCooldowns[randomKey] = 0;
+    // Reset session modifiers each run
+    playerSessionMods.player = { speedMul: 1, maxHpAdd: 0, magnetMul: 1, expMulAdd: 0, damageReductionAdd: 0 };
+    Object.keys(playerSessionMods.weapons).forEach(k => {
+        playerSessionMods.weapons[k] = { attackMul: 1, cooldownMul: 1, rangeMul: 1, explosionMul: 1, blastMul: 1 };
+    });
 
+    applyMetaUpgrades();
     updateUI();
 }
 
@@ -576,7 +926,8 @@ function updatePlayer() {
     if (dx || dy) {
         player.lastMoveAngle = Math.atan2(dy, dx);
         const l = Math.hypot(dx, dy);
-        player.x += (dx / l) * player.speed; player.y += (dy / l) * player.speed;
+        const moveSpeed = player.speed * (playerSessionMods.player.speedMul || 1);
+        player.x += (dx / l) * moveSpeed; player.y += (dy / l) * moveSpeed;
     }
     player.x = clamp(player.x, 0, world.width);
     player.y = clamp(player.y, 0, world.height);
@@ -613,8 +964,12 @@ function updatePlayer() {
             if (key === 'gun') {
                 const target = findNearest(w.range);
                 if (target) {
-                    bullets.push(new Bullet(player.x, player.y, target.x, target.y));
-                    player.weaponCooldowns[key] = w.cooldown;
+                    const wm = playerSessionMods.weapons[key] || {};
+                    const effectiveRange = (w.range || 300) * (wm.rangeMul || 1);
+                    const b = new Bullet(player.x, player.y, target.x, target.y, false, effectiveRange);
+                    b._attackBase = (w.attackPower || 1) * (wm.attackMul || 1);
+                    bullets.push(b);
+                    player.weaponCooldowns[key] = (w.cooldown || 1) * (wm.cooldownMul || 1);
                     playWeaponSound(soundManager.playShoot);
                 }
             }
@@ -624,29 +979,40 @@ function updatePlayer() {
                 // Aim at target or forward
                 const aimAngle = target ? Math.atan2(target.y - player.y, target.x - player.x) : (player.lastMoveAngle || 0);
 
-                for (let i = 0; i < w.count; i++) {
-                    const spread = (Math.random() - 0.5) * w.spread;
-                    const fireAngle = aimAngle + spread;
-                    const tx = player.x + Math.cos(fireAngle) * 100;
-                    const ty = player.y + Math.sin(fireAngle) * 100;
-                    // Pass w.range as maxDist
-                    bullets.push(new Bullet(player.x, player.y, tx, ty, false, w.range));
+                    const wm = playerSessionMods.weapons[key] || {};
+                    for (let i = 0; i < w.count; i++) {
+                        const spread = (Math.random() - 0.5) * w.spread;
+                        const fireAngle = aimAngle + spread;
+                        const tx = player.x + Math.cos(fireAngle) * 100;
+                        const ty = player.y + Math.sin(fireAngle) * 100;
+                        // Pass w.range as maxDist
+                    const effectiveRange = (w.range || 100) * (wm.rangeMul || 1);
+                    // create bullet with effective range and mark the bullet's base damage using session attackMul
+                    const b = new Bullet(player.x, player.y, tx, ty, false, effectiveRange);
+                    b._attackBase = (w.attackPower || 1) * (wm.attackMul || 1);
+                    bullets.push(b);
                 }
-                player.weaponCooldowns[key] = w.cooldown;
+                player.weaponCooldowns[key] = (w.cooldown || 1) * ((wm.cooldownMul || 1));
                 playWeaponSound(soundManager.playShotgun);
             }
             else if (key === 'laser') {
                 const target = findNearest(w.range);
                 if (target) {
-                    laserBeams.push({ x1: player.x, y1: player.y, x2: target.x, y2: target.y, life: 10, w: w });
+                    // Apply session weapon modifiers when computing effects
+                    const wEffective = Object.assign({}, w);
+                    const wm = playerSessionMods.weapons[key] || {};
+                    wEffective.attackPower = (w.attackPower || 1) * (wm.attackMul || 1);
+                    wEffective.cooldown = (w.cooldown || 1) * (wm.cooldownMul || 1);
+                    wEffective.range = (w.range || 0) * (wm.rangeMul || 1);
+                    laserBeams.push({ x1: player.x, y1: player.y, x2: target.x, y2: target.y, life: 10, w: wEffective });
                     player.weaponCooldowns[key] = w.cooldown;
                     playWeaponSound(soundManager.playRailgun);
                     const a = Math.atan2(target.y - player.y, target.x - player.x);
-                    const lx = player.x + Math.cos(a) * w.range;
-                    const ly = player.y + Math.sin(a) * w.range;
+                    const lx = player.x + Math.cos(a) * wEffective.range;
+                    const ly = player.y + Math.sin(a) * wEffective.range;
                     enemies.forEach(e => {
                         if (pointLineDist(e.x, e.y, player.x, player.y, lx, ly) < (e.isBoss ? e.size : e.size)) {
-                            e.takeDamage(w.attackPower * dmgMult);
+                            e.takeDamage(wEffective.attackPower * dmgMult);
                         }
                     });
                 }
@@ -811,21 +1177,36 @@ function generateUpgradeOptions() {
     upgradeOptions = finalOptions;
 }
 function saveScore() {
+    const previousBest = getHighScores()[0]?.score || 0;
     const result = {
         score: score,
         time: document.getElementById('timeDisplay').innerText,
         wave: wave,
         damage: Math.floor(totalDamageDealt),
         weapons: player.weapons.map(w => weapons[w].name),
-        date: new Date().toLocaleString()
+        date: new Date().toLocaleString(),
+        id: Date.now() + '_' + Math.floor(Math.random() * 100000)
     };
 
     let highScores = getHighScores();
     highScores.push(result);
     highScores.sort((a, b) => b.score - a.score);
-    highScores = highScores.slice(0, 5);
+    highScores = highScores.slice(0, 10);
 
     localStorage.setItem('neonSurvivorScores', JSON.stringify(highScores));
+
+    const meta = loadMetaData();
+    const shardGainLevel = meta.upgrades.shardGain || 0;
+    const baseShards = Math.floor(wave * 2) + Math.floor(score / 300);
+    const multiplier = 1 + shardGainLevel * 0.20;
+    const earnedShards = Math.max(0, Math.floor(baseShards * multiplier));
+    meta.shards += earnedShards;
+    meta.totalRuns += 1;
+    saveMetaData(meta);
+
+    lastRunShardsEarned = earnedShards;
+    lastRunWasNewRecord = score > previousBest;
+    lastRunRecordId = result.id;
 }
 
 function getHighScores() {
@@ -896,6 +1277,12 @@ function animate(timestamp = 0) {
             } else {
                 enemyBaseHp = (10 * Math.pow(35, 0.9)) + (wave - 35) * 50;
             }
+
+            if (player.healOnWave > 0) {
+                player.hp = Math.min(player.maxHp, player.hp + player.healOnWave);
+                addFloatingText(player.x, player.y, `+${player.healOnWave} HP`, '#00ff88');
+            }
+
             soundManager.setWave(wave);
             if (wave % 5 === 0) {
                 spawnBoss();
@@ -952,8 +1339,10 @@ function animate(timestamp = 0) {
             const d = Math.hypot(g.x - player.x, g.y - player.y);
             if (d < player.magnetRadius) {
                 g.x += (player.x - g.x) * 0.1; g.y += (player.y - g.y) * 0.1;
-                if (d < 20) {
-                    player.exp += g.val * (player.expMult || 1);
+                    if (d < 20) {
+                    // Use base persistent expMult and add session exp modifiers (additive)
+                    const totalExpMul = (player.expMult || 1) * (1 + (playerSessionMods.player.expMulAdd || 0));
+                    player.exp += g.val * totalExpMul * (1 + (player.gemExpBonus || 0));
                     soundManager.playGem(); g.marked = true;
                     if (player.exp >= player.nextLevelExp) {
                         player.level++; player.exp -= player.nextLevelExp; player.nextLevelExp = Math.floor(player.nextLevelExp * 1.15);
@@ -975,7 +1364,8 @@ function animate(timestamp = 0) {
             if (!b.isEnemy) {
                 enemies.forEach(e => {
                     if (Math.hypot(e.x - b.x, e.y - b.y) < (e.isBoss ? e.size : e.size) + b.size) {
-                        const baseDmg = (weapons.scatter && b.maxDist < 2000) ? weapons.scatter.attackPower : weapons.gun.attackPower;
+                        // If bullet has session-modified base attack, use it; otherwise fallback to weapon definitions
+                        const baseDmg = (b._attackBase !== undefined) ? b._attackBase : ((weapons.scatter && b.maxDist < 2000) ? weapons.scatter.attackPower : weapons.gun.attackPower);
                         e.takeDamage(baseDmg * dmgMult); b.marked = true;
                     }
                 });
@@ -1089,6 +1479,8 @@ function animate(timestamp = 0) {
             const lineHeight = 20 * responsiveScale;
             wrapText(ctx, opt.description, x + boxWidth / 2, textY, boxWidth - 20, lineHeight);
         });
+    } else if (gameState === "meta") {
+        drawMetaScreen();
     } else if (gameState === "gameover") {
         ctx.fillStyle = "rgba(10, 0, 0, 0.9)"; ctx.fillRect(0, 0, cssWidth, cssHeight);
 
@@ -1107,7 +1499,7 @@ function animate(timestamp = 0) {
         const safeBottom = cssHeight - safeMargin;
         const titleY = safeMargin + titleSize;
         const highScores = getHighScores();
-        const visibleScores = isPortrait ? highScores.slice(0, 3) : highScores.slice(0, 5);
+        const visibleScores = isPortrait ? highScores.slice(0, 5) : highScores.slice(0, 7);
 
         // Title
         ctx.fillStyle = "#ff0000";
@@ -1132,31 +1524,58 @@ function animate(timestamp = 0) {
             `SURVIVAL:     ${timeStr}`,
             `WAVE REACHED: ${wave}`,
             `TOTAL DAMAGE: ${Math.floor(totalDamageDealt)}`,
-            `WEAPONS:      ${player.weapons.length}`
+            `WEAPONS:      ${player.weapons.length}`,
+            `SHARDS GAIN:  +${lastRunShardsEarned} ✦`
         ];
         const statsBlockHeight = (lines.length * lineGap) + (lineGap * 2) + (lineGap * Math.max(1, Math.ceil(player.weapons.length / 2)));
         lines.forEach((line, i) => {
+            ctx.fillStyle = line.includes('SHARDS GAIN') ? '#84ffb9' : '#fff';
             ctx.fillText(line, statsX, statsY + 30 * responsiveScale + (i * lineGap));
         });
 
         ctx.font = `${subSize}px Arial`; ctx.fillStyle = "#aaa";
         wrapText(ctx, player.weapons.map(w => weapons[w].name).join(', '), statsX, statsY + statsBlockHeight - (lineGap * 0.5), statsWidth, 16 * responsiveScale);
 
+        if (lastRunWasNewRecord && frameCount % 50 < 25) {
+            ctx.fillStyle = '#ffe45c';
+            ctx.font = `bold ${clamp(13, 20 * responsiveScale, 26)}px 'Courier New'`;
+            ctx.fillText('NEW RECORD', statsX, statsY - 12 * responsiveScale);
+        }
+
         // High Scores
         const boardX = isPortrait ? statsX : cx + 80 * responsiveScale;
         const baseBoardY = isPortrait ? statsY + statsBlockHeight + clamp(12, 28 * responsiveScale, 48) : cy - 150 * responsiveScale;
-        const boardHeight = (visibleScores.length * 40 * responsiveScale) + 60 * responsiveScale;
+        const rowHeight = 52 * responsiveScale;
+        const boardHeight = (visibleScores.length * rowHeight) + 60 * responsiveScale;
         const maxBoardY = safeBottom - boardHeight - clamp(60, 90 * responsiveScale, 120);
         const boardY = Math.min(baseBoardY, maxBoardY);
         ctx.fillStyle = "#ffaa00"; ctx.font = `bold ${headerSize}px 'Segoe UI'`;
         ctx.fillText("HIGH SCORES", boardX, boardY);
-        ctx.font = `${bodySize - 2}px 'Courier New'`;
+
+        const rankColor = (rank) => {
+            if (rank === 1) return '#ffd700';
+            if (rank === 2) return '#c0c0c0';
+            if (rank === 3) return '#cd7f32';
+            return '#ffffff';
+        };
+
+        ctx.font = `${bodySize - 3}px 'Courier New'`;
         visibleScores.forEach((s, i) => {
-            const y = boardY + 30 * responsiveScale + (i * 40 * responsiveScale);
-            ctx.fillStyle = i === 0 ? "#ffff00" : "#fff";
+            const y = boardY + 30 * responsiveScale + (i * rowHeight);
+
+            if (s.id && s.id === lastRunRecordId) {
+                ctx.strokeStyle = '#66ffe0';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(boardX - 8, y - 14 * responsiveScale, (isPortrait ? cssWidth * 0.8 : cssWidth * 0.34), rowHeight - 6 * responsiveScale);
+            }
+
+            ctx.fillStyle = rankColor(i + 1);
             ctx.fillText(`${i + 1}. ${s.score} pts - Wave ${s.wave}`, boardX, y);
-            ctx.fillStyle = "#888";
-            ctx.fillText(`   ${s.date.split(' ')[0]}`, boardX, y + 15 * responsiveScale);
+            ctx.fillStyle = '#9da4aa';
+            ctx.fillText(`   ${s.time || '--:--'} | ${(s.date || '').split(' ')[0] || ''}`, boardX, y + 14 * responsiveScale);
+            ctx.fillStyle = '#7a838a';
+            const weaponsText = Array.isArray(s.weapons) ? s.weapons.join(', ') : '-';
+            wrapText(ctx, `   ${weaponsText}`, boardX, y + 28 * responsiveScale, (isPortrait ? cssWidth * 0.76 : cssWidth * 0.30), 13 * responsiveScale);
         });
 
         // Prompt

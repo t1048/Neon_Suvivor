@@ -164,6 +164,19 @@ canvas {
     transform: scale(1.05);
 }
 
+.btn-secondary {
+    margin-top: 0.8rem;
+    border-color: #57ffaa;
+    color: #57ffaa;
+    box-shadow: 0 0 10px rgba(87, 255, 170, 0.28);
+}
+
+.btn-secondary:hover {
+    background: #57ffaa;
+    color: #051110;
+    box-shadow: 0 0 30px rgba(87, 255, 170, 0.65);
+}
+
 .audio-container {
     position: absolute;
     top: 0.75rem;
