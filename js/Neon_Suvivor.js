@@ -66,10 +66,58 @@ const volumeValue = document.getElementById('volumeValue');
 const gameSubtitle = document.getElementById('gameSubtitle');
 
 const META_STORAGE_KEY = 'neonSurvivorMeta';
+const GAME_STATES = {
+    START: 'start',
+    PLAYING: 'playing',
+    LEVELUP: 'levelup',
+    META: 'meta',
+    GAMEOVER: 'gameover'
+};
+
+let gameState = GAME_STATES.START;
+let isAnimating = false;
+let enemyGlobalHpMul = 1;
+let score = 0;
+let wave = 1;
+let frameCount = 0;
+let timeSeconds = 0;
+let totalDamageDealt = 0;
+let lastRunShardsEarned = 0;
+let lastRunWasNewRecord = false;
+let lastRunRecordId = null;
+let hoveredMetaUpgradeId = null;
+const metaClickAreas = { cards: [] };
+const MAX_DT = 0.05;
+let dtSeconds = 1 / 60;
+let dtFrames = 1;
+let lastTimestamp = 0;
+let spawnAccumulator = 0;
 
 const initialVolume = Math.round(soundManager.masterVolume * 100);
 volumeSlider.value = initialVolume;
 volumeValue.innerText = `${initialVolume}%`;
+
+function setAudioPanel(isOpen) {
+    audioPanel.classList.toggle('open', !!isOpen);
+    audioPanel.setAttribute('aria-hidden', String(!isOpen));
+    audioToggle.setAttribute('aria-expanded', String(!!isOpen));
+}
+
+audioToggle.addEventListener('click', () => {
+    const nextOpen = !audioPanel.classList.contains('open');
+    setAudioPanel(nextOpen);
+});
+
+muteBtn.addEventListener('click', () => {
+    soundManager.toggleMute();
+    muteBtn.textContent = soundManager.isMuted ? '🔇 UNMUTE' : '🔊 MUTE';
+});
+
+volumeSlider.addEventListener('input', (e) => {
+    const volume = Number(e.target.value) / 100;
+    soundManager.setMasterVolume(volume);
+    volumeValue.innerText = `${Math.round(volume * 100)}%`;
+});
 
 // Touch Controls - Define early for use in event listeners
 const touchControls = document.getElementById('touchControls');
@@ -477,6 +525,128 @@ function getUpgradeLayout() {
 
 let enemyBaseHp = 10;
 let spawnRate = 60;
+
+function loadMetaData() {
+    const defaultUpgrades = Object.fromEntries(metaUpgradeDefs.map((def) => [def.id, 0]));
+    const defaults = { shards: 0, totalRuns: 0, upgrades: defaultUpgrades };
+    const raw = localStorage.getItem(META_STORAGE_KEY);
+    if (!raw) return defaults;
+    try {
+        const parsed = JSON.parse(raw);
+        return {
+            shards: Number.isFinite(parsed.shards) ? parsed.shards : 0,
+            totalRuns: Number.isFinite(parsed.totalRuns) ? parsed.totalRuns : 0,
+            upgrades: { ...defaultUpgrades, ...(parsed.upgrades || {}) }
+        };
+    } catch (_) {
+        return defaults;
+    }
+}
+
+function saveMetaData(meta) {
+    localStorage.setItem(META_STORAGE_KEY, JSON.stringify(meta));
+}
+
+function applyMetaUpgrades() {
+    const meta = loadMetaData();
+    const u = meta.upgrades || {};
+    const startHpLv = u.startHp || 0;
+    const atkLv = u.attackPower || 0;
+    const speedLv = u.moveSpeed || 0;
+    const cdrLv = u.cooldown || 0;
+    const expLv = u.expGain || 0;
+    const magnetLv = u.magnetRange || 0;
+    const armorLv = u.armor || 0;
+    const healLv = u.healOnWave || 0;
+    const gemLv = u.gemBonus || 0;
+
+    player.maxHp += startHpLv * 15;
+    player.hp = player.maxHp;
+    playerSessionMods.player.speedMul *= (1 + speedLv * 0.04);
+    playerSessionMods.player.expMulAdd += expLv * 0.10;
+    playerSessionMods.player.magnetMul *= (1 + magnetLv * 0.15);
+    playerSessionMods.player.damageReductionAdd += armorLv * 0.05;
+    player.healOnWave = healLv * 8;
+    player.gemExpBonus = gemLv * 0.12;
+
+    Object.keys(playerSessionMods.weapons).forEach((key) => {
+        playerSessionMods.weapons[key].attackMul *= (1 + atkLv * 0.05);
+        playerSessionMods.weapons[key].cooldownMul *= Math.pow(0.95, cdrLv);
+    });
+}
+
+function handleMetaClick(clickX, clickY) {
+    const clicked = metaClickAreas.cards.find((card) => pointInRect(clickX, clickY, card));
+    if (!clicked) return;
+    const meta = loadMetaData();
+    const level = meta.upgrades[clicked.def.id] || 0;
+    if (level >= clicked.def.maxLevel) return;
+    const cost = clicked.def.costs[level];
+    if (meta.shards < cost) return;
+    meta.shards -= cost;
+    meta.upgrades[clicked.def.id] = level + 1;
+    saveMetaData(meta);
+}
+
+function drawMetaScreen() {
+    const meta = loadMetaData();
+    const cardWidth = Math.min(290, cssWidth * 0.26);
+    const cardHeight = 110;
+    const gap = 14;
+    const cols = Math.max(1, Math.floor((cssWidth - 30) / (cardWidth + gap)));
+    const startX = (cssWidth - (cols * cardWidth + (cols - 1) * gap)) / 2;
+    const startY = 120;
+    metaClickAreas.cards = [];
+
+    ctx.fillStyle = '#030610';
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
+    ctx.fillStyle = '#00d9ff';
+    ctx.font = 'bold 36px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('NEURAL UPGRADES', cssWidth / 2, 58);
+    ctx.font = '20px Arial';
+    ctx.fillStyle = '#84ffb9';
+    ctx.fillText(`SHARDS: ${meta.shards} ✦`, cssWidth / 2, 92);
+
+    metaUpgradeDefs.forEach((def, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = startX + col * (cardWidth + gap);
+        const y = startY + row * (cardHeight + gap);
+        const level = meta.upgrades[def.id] || 0;
+        const maxed = level >= def.maxLevel;
+        const cost = maxed ? '-' : def.costs[level];
+        const hovered = hoveredMetaUpgradeId === def.id;
+
+        ctx.fillStyle = hovered ? '#1a3040' : '#111a28';
+        ctx.fillRect(x, y, cardWidth, cardHeight);
+        ctx.strokeStyle = maxed ? '#84ffb9' : '#00aaff';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, cardWidth, cardHeight);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 15px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText(def.name, x + 12, y + 24);
+        ctx.font = '13px Arial';
+        ctx.fillStyle = '#a8b7c5';
+        ctx.fillText(def.description, x + 12, y + 47);
+        ctx.fillStyle = '#ffd166';
+        ctx.fillText(`Lv ${level}/${def.maxLevel}`, x + 12, y + 70);
+        ctx.fillStyle = maxed ? '#84ffb9' : '#fff';
+        ctx.fillText(maxed ? 'MAX' : `Cost: ${cost} ✦`, x + 12, y + 92);
+
+        metaClickAreas.cards.push({ x, y, width: cardWidth, height: cardHeight, def });
+    });
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#9da4aa';
+    ctx.font = '14px Arial';
+    ctx.fillText('Click card to upgrade / Press SYSTEM START to play', cssWidth / 2, cssHeight - 20);
+}
+
+function pointInRect(px, py, rect) {
+    return px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
+}
 
 function resetGame() {
     soundManager.stopBGM();
