@@ -155,12 +155,18 @@ function handleMetaHover(mouseX, mouseY) {
 }
 
 const keys = {};
-window.addEventListener('keydown', (e) => keys[e.key] = true);
-window.addEventListener('keyup', (e) => keys[e.key] = false);
+window.addEventListener('keydown', function (e) {
+    keys[e.key] = true;
+});
+window.addEventListener('keyup', function (e) {
+    keys[e.key] = false;
+});
 
 // Prevent stuck keys when window loses focus
-window.addEventListener('blur', () => {
-    Object.keys(keys).forEach(key => keys[key] = false);
+window.addEventListener('blur', function () {
+    Object.keys(keys).forEach(function (key) {
+        keys[key] = false;
+    });
 });
 
 // Touch Controls State
