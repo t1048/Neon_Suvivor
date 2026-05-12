@@ -137,33 +137,11 @@ neuralBtn.addEventListener('click', () => {
     soundManager.init();
     overlay.style.display = 'none';
     ui.style.display = 'none';
-        audioContainer.style.display = 'none';
-        touchControls.style.display = 'none';
-        soundManager.stopBGM();
-        gameState = 'start';
-    
-
-    if (pointInRect(clickX, clickY, metaClickAreas.deploy)) {
-        overlay.style.display = 'none';
-        ui.style.display = 'flex';
-        audioContainer.style.display = 'block';
-        if (isTouchDevice()) touchControls.style.display = 'block';
-        setAudioPanel(false);
-        gameState = 'playing';
-        resetGame();
-        soundManager.startBGM();
-        hideAddressBar();
-        return;
-    }
-
-    for (let i = 0; i < metaClickAreas.cards.length; i++) {
-        const card = metaClickAreas.cards[i];
-        if (pointInRect(clickX, clickY, card)) {
-            tryPurchaseMetaUpgrade(card.def.id);
-            return;
-        }
-    }
-}
+    audioContainer.style.display = 'none';
+    touchControls.style.display = 'none';
+    soundManager.stopBGM();
+    gameState = 'meta';
+});
 
 function handleMetaHover(mouseX, mouseY) {
     hoveredMetaUpgradeId = null;
