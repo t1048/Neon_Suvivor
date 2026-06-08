@@ -1,0 +1,48 @@
+# AGENTS.md — Neon Survivor
+
+## Project
+Top-down survival game. **Zero build step.** Open `index.html` in a browser to run.
+Deployed to GitHub Pages at `https://t1048.github.io/Neon_Suvivor`.
+
+## Run / Debug
+- Open `index.html` directly, or serve statically: `python -m http.server`
+- No npm/pip/build toolchain. No tests, no linter, no typecheck configured.
+- Console debug helpers: `resetGame()`, `spawnBoss()`, `soundManager.startBGM()`, `soundManager.setWave(n)`
+
+## File Roles
+| File | Purpose |
+|---|---|
+| `index.html` | UI elements (overlays, audio panel, touch joystick), script load order |
+| `js/Neon_Suvivor.js` | Main loop, input, `gameState`, spawning, UI updates, score persistence |
+| `js/data.js` | Balance data: `weaponsInitial`, `upgrades`, `enemyTypes` |
+| `js/entities.js` | Projectile/effect classes: `Bullet`, `RotatingBlade`, `BombProjectile`, `Landmine`, `FloatingText`, `Particle` |
+| `js/bosses.js` | Boss classes extending `BossBase`, `createRandomBoss()` |
+| `js/audio.js` | `SoundManager` — Web Audio API BGM scheduler, SFX, boss mode, overheat |
+| `css/Neon_Suvivor.css` | All styles |
+
+## Script Load Order (matters)
+`data.js` → `audio.js` → `entities.js` → `bosses.js` → `Neon_Suvivor.js`
+Globals are shared; files depend on each other via global scope.
+
+## Architecture Gotchas
+- **All state is global.** `gameState`, `player`, `enemies`, `bullets`, `bosses`, `camera`, `frameCount`, etc. are module-level variables.
+- **Array mutation via `splice`.** Dead entities are marked (`this.marked = true`), then spliced out. Follow this pattern; do not switch to filter-without-splice.
+- **Frame timing:** `frameCount` increments every frame; `timeSeconds` increments every 60 frames. Wave advances every 30 seconds. Boss spawns at `wave % 5 === 0`.
+- **World size:** 3000×3000. Camera follows player with zoom that varies by viewport (0.6 landscape mobile, 0.75 portrait mobile, 0.85 desktop).
+- **Canvas uses `devicePixelRatio`.** Drawing uses CSS pixels (`cssWidth`/`cssHeight`); world drawing accounts for `camera.zoom`.
+- **`gameState` values:** `"start"`, `"playing"`, `"levelup"`, `"meta"`, `"gameover"` (see `GAME_STATES` constant).
+- **Audio requires user gesture.** `soundManager.init()` is called on Start button click (autoplay policy).
+- **Overheat:** triggers when valid cooldown < 9 frames (except `sanctuary`/`blade`).
+
+## Adding Content
+- **New weapon:** add entry to `weaponsInitial` in `data.js`, implement firing logic in the `player.weapons.forEach` block in `Neon_Suvivor.js`, add projectile class to `entities.js` if needed.
+- **New boss:** add class extending `BossBase` in `bosses.js`, register in `createRandomBoss()` array.
+- **New upgrade:** add to `upgrades` array in `data.js`.
+- **New SFX:** add method to `SoundManager` in `audio.js`.
+
+## Persistence
+- High scores: `localStorage` key `neonSurvivorScores` (top 5).
+- Meta upgrades: `localStorage` key `neonSurvivorMeta`.
+
+## Language
+README and copilot instructions are in Japanese. Code comments are mixed Japanese/English. Keep consistency with existing style.

@@ -1,8 +1,15 @@
 // --- Data.js ---
 const enemyTypes = {
-    normal: { hpMul: 1.0, spdMul: 1.0, color: '#ff4444', shape: 'square' },
-    tank: { hpMul: 3.0, spdMul: 0.6, color: '#ff8844', shape: 'hexagon' },
-    runner: { hpMul: 0.5, spdMul: 1.5, color: '#ff44aa', shape: 'triangle' }
+    normal: { hpMul: 1.0, spdMul: 1.0, color: '#ff4444', shape: 'normal' },
+    tank: { hpMul: 3.0, spdMul: 0.6, color: '#ff8844', shape: 'tank' },
+    runner: { hpMul: 0.5, spdMul: 1.5, color: '#ff44aa', shape: 'runner' },
+    shooter: { hpMul: 1.2, spdMul: 0.8, color: '#aa44ff', shape: 'shooter' },
+    ghost: { hpMul: 0.7, spdMul: 1.2, color: '#44ffff', shape: 'ghost' },
+    orbiter: { hpMul: 1.0, spdMul: 1.0, color: '#00ffcc', shape: 'orbiter' },
+    sniper: { hpMul: 0.8, spdMul: 0.7, color: '#ff2222', shape: 'sniper' },
+    splitter: { hpMul: 1.5, spdMul: 0.8, color: '#88ff00', shape: 'splitter' },
+    teleporter: { hpMul: 0.7, spdMul: 0.5, color: '#cc44ff', shape: 'teleporter' },
+    bomber: { hpMul: 0.6, spdMul: 1.3, color: '#ff8800', shape: 'bomber' }
 };
 
 const weaponsInitial = {

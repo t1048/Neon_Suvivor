@@ -162,6 +162,7 @@ function handleViewportResize() {
 
 startBtn.addEventListener('click', () => {
     soundManager.init();
+    loadEnemyImages();
     overlay.style.display = 'none';
     ui.style.display = 'flex';
     audioContainer.style.display = 'block';
@@ -1232,7 +1233,7 @@ function animate(timestamp = 0) {
         bossBullets.forEach((b, i) => {
             b.update(); b.draw();
             if (Math.hypot(player.x - b.x, player.y - b.y) < player.size + b.size) {
-                takePlayerDamage(10);
+                takePlayerDamage(b.damage || 10);
                 b.marked = true;
             }
             if (b.marked) bossBullets.splice(i, 1);

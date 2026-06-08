@@ -1,3 +1,23 @@
+const enemyImages = {};
+
+function loadEnemyImages() {
+    const types = Object.keys(enemyTypes);
+    types.forEach(type => {
+        const t = enemyTypes[type];
+        fetch(`assets/enemies/${type}.svg`)
+            .then(r => r.text())
+            .then(svg => {
+                const colored = svg.replace(/currentColor/g, t.color);
+                const blob = new Blob([colored], { type: 'image/svg+xml' });
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => { enemyImages[type] = img; };
+                img.src = url;
+            })
+            .catch(() => {});
+    });
+}
+
 // --- Boss Base Class ---
 class BossBase {
     constructor(wave) {
@@ -750,23 +770,35 @@ class Enemy {
         const r = Math.random() * 100;
         let type = 'normal';
 
-        if (wavePattern === 0) {
-            if (r > 90) type = 'runner'; else if (r > 70) type = 'tank';
+        // New enemy types (checked first, higher wave = more types)
+        if (wave >= 6 && r > 93) {
+            type = 'teleporter';
+        } else if (wave >= 5 && r > 90) {
+            type = 'sniper';
+        } else if (wave >= 4 && r > 87) {
+            type = 'splitter';
+        } else if (wave >= 3 && r > 92) {
+            type = 'orbiter';
+        } else if (wave >= 3 && r > 88) {
+            type = 'bomber';
+        } else if (wavePattern === 0) {
+            if (r > 90) type = 'runner'; else if (r > 70) type = 'tank'; else if (r > 55) type = 'shooter';
         } else if (wavePattern === 1) {
-            if (r > 40) type = 'tank'; else if (r > 85) type = 'runner';
+            if (r > 40) type = 'tank'; else if (r > 85) type = 'runner'; else if (r > 70) type = 'ghost';
         } else if (wavePattern === 2) {
-            if (r > 30) type = 'runner'; else if (r > 80) type = 'tank';
+            if (r > 30) type = 'runner'; else if (r > 80) type = 'tank'; else if (r > 60) type = 'shooter';
         } else if (wavePattern === 3) {
-            if (r > 95) type = 'runner'; else if (r > 90) type = 'tank';
+            if (r > 95) type = 'runner'; else if (r > 90) type = 'tank'; else if (r > 75) type = 'ghost';
         } else if (wavePattern === 4) {
-            if (r > 65) type = 'runner'; else if (r > 35) type = 'tank';
+            if (r > 65) type = 'runner'; else if (r > 35) type = 'tank'; else if (r > 20) type = 'shooter'; else if (r > 10) type = 'ghost';
         } else {
-            const types = ['normal', 'tank', 'runner'];
+            const types = ['normal', 'tank', 'runner', 'shooter', 'ghost'];
             type = types[Math.floor(Math.random() * types.length)];
         }
 
         const t = enemyTypes[type];
         this.type = type;
+        this.shape = t.shape;
         this.hp = enemyBaseHp * t.hpMul * (enemyGlobalHpMul || 1);
         this.maxHp = this.hp;
 
@@ -777,23 +809,218 @@ class Enemy {
         this.flash = 0; this.marked = false;
         this.pushX = 0; this.pushY = 0;
         this.isBoss = false;
+
+        // Type-specific properties
+        if (this.type === 'orbiter') {
+            this.orbitAngle = Math.atan2(this.y - player.y, this.x - player.x);
+            this.orbitRadius = 180 + Math.random() * 40;
+            this.orbitSpeed = 0.02 + Math.random() * 0.01;
+            this.trail = [];
+            this.shootCooldown = 60 + Math.floor(Math.random() * 30);
+        } else if (this.type === 'sniper') {
+            this.chargeTimer = 120 + Math.floor(Math.random() * 60);
+            this.isCharging = false;
+            this.chargeProgress = 0;
+            this.preferredDistance = 300 + Math.random() * 100;
+        } else if (this.type === 'splitter') {
+            this.size = 16;
+            this.isSplit = false;
+        } else if (this.type === 'teleporter') {
+            this.teleportTimer = 180 + Math.floor(Math.random() * 60);
+            this.alpha = 1;
+            this.teleportFlash = 0;
+        } else if (this.type === 'bomber') {
+            this.sineOffset = Math.random() * Math.PI * 2;
+            this.sineAmplitude = 80 + Math.random() * 40;
+            this.pulseRate = 0.1;
+        }
     }
     update() {
         this.pushX *= 0.8; this.pushY *= 0.8;
-        const a = Math.atan2(player.y - this.y, player.x - this.x);
-        this.x += Math.cos(a) * this.speed + this.pushX;
-        this.y += Math.sin(a) * this.speed + this.pushY;
-            if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
+        if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
 
-        if (Math.hypot(player.x - this.x, player.y - this.y) < player.size + this.size) {
-            takePlayerDamage(5);
+        if (this.type === 'orbiter') {
+            // Orbit around player
+            this.orbitAngle += this.orbitSpeed * dtFrames;
+            const targetX = player.x + Math.cos(this.orbitAngle) * this.orbitRadius;
+            const targetY = player.y + Math.sin(this.orbitAngle) * this.orbitRadius;
+            const dx = targetX - this.x;
+            const dy = targetY - this.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 1) {
+                this.x += (dx / dist) * this.speed * 1.5 + this.pushX;
+                this.y += (dy / dist) * this.speed * 1.5 + this.pushY;
+            }
+            // Trail
+            this.trail.push({ x: this.x, y: this.y, life: 8 });
+            if (this.trail.length > 8) this.trail.shift();
+            this.trail.forEach(t => t.life = Math.max(0, t.life - dtFrames));
+            // Shoot at player
+            this.shootCooldown -= dtFrames;
+            if (this.shootCooldown <= 0) {
+                const a = Math.atan2(player.y - this.y, player.x - this.x);
+                const b = new Bullet(this.x, this.y, this.x + Math.cos(a) * 100, this.y + Math.sin(a) * 100, true, 400);
+                bossBullets.push(b);
+                this.shootCooldown = 90;
+            }
+        } else if (this.type === 'sniper') {
+            // Maintain distance
+            const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+            const a = Math.atan2(player.y - this.y, player.x - this.x);
+            if (distToPlayer < this.preferredDistance - 50) {
+                // Too close, back away
+                this.x -= Math.cos(a) * this.speed + this.pushX;
+                this.y -= Math.sin(a) * this.speed + this.pushY;
+            } else if (distToPlayer > this.preferredDistance + 50) {
+                // Too far, approach
+                this.x += Math.cos(a) * this.speed + this.pushX;
+                this.y += Math.sin(a) * this.speed + this.pushY;
+            }
+            // Charge and shoot
+            this.chargeTimer -= dtFrames;
+            if (this.chargeTimer <= 0 && !this.isCharging) {
+                this.isCharging = true;
+                this.chargeProgress = 0;
+            }
+            if (this.isCharging) {
+                this.chargeProgress += dtFrames;
+                if (this.chargeProgress >= 60) {
+                    // Fire high-damage bullet
+                    const fireAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                    const b = new Bullet(this.x, this.y, this.x + Math.cos(fireAngle) * 100, this.y + Math.sin(fireAngle) * 100, true, 600);
+                    b.size = 8;
+                    b.damage = 20;
+                    bossBullets.push(b);
+                    this.isCharging = false;
+                    this.chargeTimer = 150;
+                }
+            }
+        } else if (this.type === 'teleporter') {
+            // Slow approach
+            const a = Math.atan2(player.y - this.y, player.x - this.x);
+            this.x += Math.cos(a) * this.speed * 0.5 + this.pushX;
+            this.y += Math.sin(a) * this.speed * 0.5 + this.pushY;
+            // Teleport
+            this.teleportTimer -= dtFrames;
+            if (this.teleportTimer <= 0) {
+                // Teleport to random position near player
+                const tpAngle = Math.random() * Math.PI * 2;
+                const tpDist = 150 + Math.random() * 100;
+                this.x = player.x + Math.cos(tpAngle) * tpDist;
+                this.y = player.y + Math.sin(tpAngle) * tpDist;
+                this.x = clamp(this.x, 0, world.width);
+                this.y = clamp(this.y, 0, world.height);
+                this.teleportFlash = 10;
+                // Fire 3-way spread
+                for (let i = -1; i <= 1; i++) {
+                    const spreadAngle = Math.atan2(player.y - this.y, player.x - this.x) + i * 0.3;
+                    const b = new Bullet(this.x, this.y, this.x + Math.cos(spreadAngle) * 100, this.y + Math.sin(spreadAngle) * 100, true, 350);
+                    bossBullets.push(b);
+                }
+                this.teleportTimer = 180;
+            }
+            if (this.teleportFlash > 0) {
+                this.alpha = 0.3 + Math.sin(this.teleportFlash * 0.5) * 0.3;
+                this.teleportFlash -= dtFrames;
+            } else {
+                this.alpha = 1;
+            }
+        } else if (this.type === 'bomber') {
+            // Sine wave approach
+            const a = Math.atan2(player.y - this.y, player.x - this.x);
+            const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+            this.sineOffset += 0.15 * dtFrames;
+            const perpAngle = a + Math.PI / 2;
+            const sineOffset = Math.sin(this.sineOffset) * this.sineAmplitude;
+            this.x += Math.cos(a) * this.speed + Math.cos(perpAngle) * sineOffset * 0.05 + this.pushX;
+            this.y += Math.sin(a) * this.speed + Math.sin(perpAngle) * sineOffset * 0.05 + this.pushY;
+            // Pulse faster when close
+            this.pulseRate = 0.1 + (1 - Math.min(1, distToPlayer / 200)) * 0.3;
+            // Explode when close
+            if (distToPlayer < 40) {
+                this.marked = true;
+                createParticles(this.x, this.y, this.color, 20);
+                soundManager.playExplosion();
+                // Damage player
+                takePlayerDamage(15);
+                // Damage nearby enemies
+                const blastRadius = 80;
+                enemies.forEach(e => {
+                    if (e !== this && !e.isBoss) {
+                        const d = Math.hypot(e.x - this.x, e.y - this.y);
+                        if (d < blastRadius) {
+                            e.takeDamage(30);
+                        }
+                    }
+                });
+            }
+        } else {
+            // Default: chase player (normal, tank, runner, shooter, ghost, splitter)
+            const a = Math.atan2(player.y - this.y, player.x - this.x);
+            this.x += Math.cos(a) * this.speed + this.pushX;
+            this.y += Math.sin(a) * this.speed + this.pushY;
+        }
+
+        // Contact damage (except bomber which explodes)
+        if (this.type !== 'bomber') {
+            if (Math.hypot(player.x - this.x, player.y - this.y) < player.size + this.size) {
+                takePlayerDamage(5);
+            }
         }
     }
     draw() {
         const sx = this.x - camera.x, sy = this.y - camera.y;
         if (isOffscreen(sx, sy, 50)) return;
-        ctx.fillStyle = this.flash > 0 ? '#fff' : this.color;
-        ctx.beginPath(); ctx.rect(sx - this.size, sy - this.size, this.size * 2, this.size * 2); ctx.fill();
+
+        // Draw orbiter trail
+        if (this.type === 'orbiter' && this.trail) {
+            this.trail.forEach((t, i) => {
+                const alpha = (t.life / 8) * 0.4;
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.arc(t.x - camera.x, t.y - camera.y, this.size * 0.6, 0, 6.28);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        // Draw sniper charge laser
+        if (this.type === 'sniper' && this.isCharging) {
+            const progress = this.chargeProgress / 60;
+            ctx.strokeStyle = `rgba(255, 0, 0, ${progress * 0.8})`;
+            ctx.lineWidth = 2 + progress * 3;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(player.x - camera.x, player.y - camera.y);
+            ctx.stroke();
+        }
+
+        // Draw teleporter with alpha
+        if (this.type === 'teleporter') {
+            ctx.globalAlpha = this.alpha || 1;
+        }
+
+        // Draw bomber with pulse
+        if (this.type === 'bomber') {
+            const pulse = Math.sin(frameCount * this.pulseRate) * 0.3 + 0.7;
+            ctx.globalAlpha = pulse;
+        }
+
+        const img = enemyImages[this.shape];
+        if (img) {
+            const prevFilter = ctx.filter;
+            if (this.flash > 0) ctx.filter = 'brightness(100)';
+            ctx.drawImage(img, sx - this.size, sy - this.size, this.size * 2, this.size * 2);
+            ctx.filter = prevFilter;
+        } else {
+            ctx.fillStyle = this.flash > 0 ? '#fff' : this.color;
+            ctx.beginPath(); ctx.rect(sx - this.size, sy - this.size, this.size * 2, this.size * 2); ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+
+        // HP bar
         if (this.hp < this.maxHp) {
             ctx.fillStyle = 'red'; ctx.fillRect(sx - 10, sy - 20, 20, 3);
             ctx.fillStyle = '#0f0'; ctx.fillRect(sx - 10, sy - 20, 20 * (this.hp / this.maxHp), 3);
@@ -810,6 +1037,24 @@ class Enemy {
             createParticles(this.x, this.y, this.color, 5);
             gems.push({ x: this.x, y: this.y, val: 10 + wave * 2, size: 5, marked: false });
             updateUI();
+
+            // Splitter: spawn 2 mini splitters
+            if (this.type === 'splitter' && !this.isSplit) {
+                for (let i = 0; i < 2; i++) {
+                    const mini = new Enemy();
+                    mini.type = 'splitter';
+                    mini.shape = 'splitter';
+                    mini.hp = enemyBaseHp * 0.5 * (enemyGlobalHpMul || 1);
+                    mini.maxHp = mini.hp;
+                    mini.size = 8;
+                    mini.speed = this.speed * 1.5;
+                    mini.color = this.color;
+                    mini.x = this.x + (Math.random() - 0.5) * 30;
+                    mini.y = this.y + (Math.random() - 0.5) * 30;
+                    mini.isSplit = true;
+                    enemies.push(mini);
+                }
+            }
         }
     }
 }
