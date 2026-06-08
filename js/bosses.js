@@ -159,7 +159,7 @@ class BossCharger extends BossBase {
                 this.trailAccumulator += dtSeconds;
                 if (this.trailAccumulator >= 0.033) {
                     this.trailAccumulator -= 0.033;
-                this.trail.push({ x: this.x, y: this.y, life: 15 });
+                this.trail.push({ x: this.x, y: this.y, life: 30 });
             }
 
                 this.chargeTimer = Math.max(0, this.chargeTimer - dtFrames);
@@ -176,6 +176,12 @@ class BossCharger extends BossBase {
             this.y += Math.sin(a) * this.speed;
             this.checkPlayerCollision(15);
 
+            this.trailAccumulator += dtSeconds;
+            if (this.trailAccumulator >= 0.033) {
+                this.trailAccumulator -= 0.033;
+                this.trail.push({ x: this.x, y: this.y, life: 30 });
+            }
+
                 this.chargeCooldown = Math.max(0, this.chargeCooldown - dtFrames);
             if (this.chargeCooldown <= 0) {
                 this.isCharging = true;
@@ -189,7 +195,7 @@ class BossCharger extends BossBase {
             }
         }
 
-    this.trail.forEach(t => t.life = Math.max(0, t.life - dtFrames));
+        this.trail.forEach(t => t.life = Math.max(0, t.life - dtFrames));
         this.trail = this.trail.filter(t => t.life > 0);
     }
 
@@ -197,14 +203,25 @@ class BossCharger extends BossBase {
         const sx = this.x - camera.x, sy = this.y - camera.y;
         if (isOffscreen(sx, sy)) return;
 
-        this.trail.forEach(t => {
-            ctx.globalAlpha = t.life / 15;
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            ctx.arc(t.x - camera.x, t.y - camera.y, this.size * 0.5, 0, 6.28);
-            ctx.fill();
-        });
-        ctx.globalAlpha = 1;
+        if (this.trail.length > 1) {
+            ctx.save();
+            ctx.shadowColor = this.color;
+            for (let i = 1; i < this.trail.length; i++) {
+                const t = this.trail[i];
+                const progress = i / this.trail.length;
+                const alpha = progress * 0.7;
+                const width = this.size * 1.2 * progress;
+                ctx.globalAlpha = alpha;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = width;
+                ctx.shadowBlur = 12 * progress;
+                ctx.beginPath();
+                ctx.moveTo(this.trail[i - 1].x - camera.x, this.trail[i - 1].y - camera.y);
+                ctx.lineTo(t.x - camera.x, t.y - camera.y);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
 
         if (!this.isCharging && this.chargeCooldown < 30 && this.chargeCooldown > 0) {
             ctx.strokeStyle = '#ff0000';
@@ -834,6 +851,7 @@ class Enemy {
             this.sineAmplitude = 80 + Math.random() * 40;
             this.pulseRate = 0.1;
         }
+        if (!this.trail) this.trail = [];
     }
     update() {
         this.pushX *= 0.8; this.pushY *= 0.8;
@@ -852,9 +870,8 @@ class Enemy {
                 this.y += (dy / dist) * this.speed * 1.5 + this.pushY;
             }
             // Trail
-            this.trail.push({ x: this.x, y: this.y, life: 8 });
-            if (this.trail.length > 8) this.trail.shift();
-            this.trail.forEach(t => t.life = Math.max(0, t.life - dtFrames));
+            this.trail.push({ x: this.x, y: this.y, life: 30 });
+            if (this.trail.length > 30) this.trail.shift();
             // Shoot at player
             this.shootCooldown -= dtFrames;
             if (this.shootCooldown <= 0) {
@@ -890,6 +907,7 @@ class Enemy {
                     const b = new Bullet(this.x, this.y, this.x + Math.cos(fireAngle) * 100, this.y + Math.sin(fireAngle) * 100, true, 600);
                     b.size = 8;
                     b.damage = 20;
+                    b.hp = 3; b.maxHp = 3;
                     bossBullets.push(b);
                     this.isCharging = false;
                     this.chargeTimer = 150;
@@ -934,6 +952,8 @@ class Enemy {
             const sineOffset = Math.sin(this.sineOffset) * this.sineAmplitude;
             this.x += Math.cos(a) * this.speed + Math.cos(perpAngle) * sineOffset * 0.05 + this.pushX;
             this.y += Math.sin(a) * this.speed + Math.sin(perpAngle) * sineOffset * 0.05 + this.pushY;
+            this.trail.push({ x: this.x, y: this.y, life: 30 });
+            if (this.trail.length > 30) this.trail.shift();
             // Pulse faster when close
             this.pulseRate = 0.1 + (1 - Math.min(1, distToPlayer / 200)) * 0.3;
             // Explode when close
@@ -959,6 +979,14 @@ class Enemy {
             const a = Math.atan2(player.y - this.y, player.x - this.x);
             this.x += Math.cos(a) * this.speed + this.pushX;
             this.y += Math.sin(a) * this.speed + this.pushY;
+            this.trail.push({ x: this.x, y: this.y, life: 30 });
+            if (this.trail.length > 30) this.trail.shift();
+        }
+
+        // Trail decay
+        if (this.trail) {
+            this.trail.forEach(t => t.life = Math.max(0, t.life - dtFrames));
+            this.trail = this.trail.filter(t => t.life > 0);
         }
 
         // Contact damage (except bomber which explodes)
@@ -968,21 +996,33 @@ class Enemy {
             }
         }
     }
+    drawNeonTrail() {
+        if (!this.trail || this.trail.length < 2) return;
+        ctx.save();
+        ctx.shadowColor = this.color;
+        for (let i = 1; i < this.trail.length; i++) {
+            const t = this.trail[i];
+            const progress = i / this.trail.length;
+            const alpha = progress * 0.7;
+            const width = this.size * 1.2 * progress;
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = width;
+            ctx.shadowBlur = 12 * progress;
+            ctx.beginPath();
+            ctx.moveTo(this.trail[i - 1].x - camera.x, this.trail[i - 1].y - camera.y);
+            ctx.lineTo(t.x - camera.x, t.y - camera.y);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
     draw() {
         const sx = this.x - camera.x, sy = this.y - camera.y;
         if (isOffscreen(sx, sy, 50)) return;
 
-        // Draw orbiter trail
-        if (this.type === 'orbiter' && this.trail) {
-            this.trail.forEach((t, i) => {
-                const alpha = (t.life / 8) * 0.4;
-                ctx.fillStyle = this.color;
-                ctx.globalAlpha = alpha;
-                ctx.beginPath();
-                ctx.arc(t.x - camera.x, t.y - camera.y, this.size * 0.6, 0, 6.28);
-                ctx.fill();
-            });
-            ctx.globalAlpha = 1;
+        // Draw enemy trail
+        if (this.trail && this.trail.length > 1) {
+            this.drawNeonTrail();
         }
 
         // Draw sniper charge laser

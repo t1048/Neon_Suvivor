@@ -42,6 +42,7 @@ class Bullet {
         // Life determines range if maxDist provided
         this.life = isEnemy ? 120 : (maxDist / this.speed);
         this.marked = false;
+        if (isEnemy) { this.hp = 1; this.maxHp = 1; }
     }
     update() {
         this.x += this.vx;
@@ -68,7 +69,8 @@ class Bullet {
 
         ctx.globalAlpha = this.alpha || 1;
         ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
-        ctx.beginPath(); ctx.arc(this.x - camera.x, this.y - camera.y, this.size, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
+        const drawSize = (this.isEnemy && this.maxHp > 1) ? this.size * (this.hp / this.maxHp) : this.size;
+        ctx.beginPath(); ctx.arc(this.x - camera.x, this.y - camera.y, drawSize, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
     }
 }
@@ -108,6 +110,18 @@ class BombProjectile {
                 e.takeDamage(dmg * damageMult);
             }
         });
+        for (let i = bossBullets.length - 1; i >= 0; i--) {
+            const eb = bossBullets[i];
+            if (eb.marked) continue;
+            const dist = Math.hypot(eb.x - this.x, eb.y - this.y);
+            if (dist < r + eb.size) {
+                eb.hp -= dmg;
+                if (eb.hp <= 0) {
+                    eb.marked = true;
+                    createParticles(eb.x, eb.y, '#ff4444', 5);
+                }
+            }
+        }
         bombs.push({ x: this.x, y: this.y, r: 0, maxR: r, alpha: 1 });
     }
     draw() {
@@ -160,6 +174,23 @@ class RotatingBlade {
                     soundManager.playBlade();
                 }
             });
+            const bladeDmg = weaponData.attackPower * getDamageMultiplier();
+            for (let i = bossBullets.length - 1; i >= 0; i--) {
+                const eb = bossBullets[i];
+                if (eb.marked) continue;
+                const dist = pointLineDist(eb.x, eb.y, startX, startY, tipX, tipY);
+                const dx = tipX - startX;
+                const dy = tipY - startY;
+                const lenSq = dx * dx + dy * dy;
+                const t = ((eb.x - startX) * dx + (eb.y - startY) * dy) / lenSq;
+                if (t >= 0 && t <= 1 && dist < thickness + eb.size) {
+                    eb.hp -= bladeDmg;
+                    if (eb.hp <= 0) {
+                        eb.marked = true;
+                        createParticles(eb.x, eb.y, '#ff4444', 5);
+                    }
+                }
+            }
         }
     }
 
@@ -225,6 +256,24 @@ class WhipHitbox {
                     e.pushY += Math.sin(pushAngle) * 5;
                 }
             });
+            for (let i = bossBullets.length - 1; i >= 0; i--) {
+                const eb = bossBullets[i];
+                if (eb.marked) continue;
+                const dx = eb.x - this.x;
+                const dy = eb.y - this.y;
+                const dist = Math.hypot(dx, dy);
+                const angleToBullet = Math.atan2(dy, dx);
+                let angleDiff = angleToBullet - this.angle;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                if (dist < this.range && Math.abs(angleDiff) < this.width / 2) {
+                    eb.hp -= dmg;
+                    if (eb.hp <= 0) {
+                        eb.marked = true;
+                        createParticles(eb.x, eb.y, '#ff4444', 5);
+                    }
+                }
+            }
         }
     }
     draw() {
@@ -308,6 +357,15 @@ class Landmine {
                 e.takeDamage(dmg * damageMult);
             }
         });
+        for (let i = bossBullets.length - 1; i >= 0; i--) {
+            const eb = bossBullets[i];
+            if (eb.marked) continue;
+            const dist = Math.hypot(eb.x - this.x, eb.y - this.y);
+            if (dist < this.blastRadius) {
+                eb.marked = true;
+                createParticles(eb.x, eb.y, '#ff4444', 5);
+            }
+        }
         bombs.push({ x: this.x, y: this.y, r: 0, maxR: this.blastRadius, alpha: 1, color: '#ffff00' });
     }
     draw() {

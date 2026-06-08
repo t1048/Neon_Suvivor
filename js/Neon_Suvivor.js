@@ -901,6 +901,20 @@ function updatePlayer() {
                     }
                     thunders.push(new ThunderStrike(player.x, player.y, chain));
                     chain.forEach(e => e.takeDamage(w.attackPower * dmgMult));
+                    const thunderDmg = w.attackPower * dmgMult;
+                    chain.forEach(e => {
+                        for (let i = bossBullets.length - 1; i >= 0; i--) {
+                            const eb = bossBullets[i];
+                            if (eb.marked) continue;
+                            if (Math.hypot(eb.x - e.x, eb.y - e.y) < 60 + eb.size) {
+                                eb.hp -= thunderDmg;
+                                if (eb.hp <= 0) {
+                                    eb.marked = true;
+                                    createParticles(eb.x, eb.y, '#ff4444', 5);
+                                }
+                            }
+                        }
+                    });
                     player.weaponCooldowns[key] = w.cooldown;
                     playWeaponSound(soundManager.playThunder);
                 }
@@ -914,6 +928,18 @@ function updatePlayer() {
                         e.pushY = Math.sin(a) * 6;
                     }
                 });
+                const sanctuaryDmg = w.attackPower * dmgMult;
+                for (let i = bossBullets.length - 1; i >= 0; i--) {
+                    const eb = bossBullets[i];
+                    if (eb.marked) continue;
+                    if (Math.hypot(eb.x - player.x, eb.y - player.y) < w.range + eb.size) {
+                        eb.hp -= sanctuaryDmg;
+                        if (eb.hp <= 0) {
+                            eb.marked = true;
+                            createParticles(eb.x, eb.y, '#ff4444', 5);
+                        }
+                    }
+                }
                 player.weaponCooldowns[key] = w.cooldown;
                     // Spawn particles periodically using integer frame detection
                     const prevFrame = Math.floor(frameCount - dtFrames);
@@ -1221,6 +1247,22 @@ function animate(timestamp = 0) {
                         e.takeDamage(baseDmg * dmgMult); b.marked = true;
                     }
                 });
+                if (!b.marked) {
+                    const baseDmg = (b._attackBase !== undefined) ? b._attackBase : ((weapons.scatter && b.maxDist < 2000) ? weapons.scatter.attackPower : weapons.gun.attackPower);
+                    for (let j = bossBullets.length - 1; j >= 0; j--) {
+                        const eb = bossBullets[j];
+                        if (eb.marked) continue;
+                        if (Math.hypot(eb.x - b.x, eb.y - b.y) < eb.size + b.size) {
+                            eb.hp -= baseDmg * dmgMult;
+                            if (eb.hp <= 0) {
+                                eb.marked = true;
+                                createParticles(eb.x, eb.y, '#ff4444', 5);
+                            }
+                            b.marked = true;
+                            break;
+                        }
+                    }
+                }
             } else {
                 if (Math.hypot(player.x - b.x, player.y - b.y) < player.size + b.size) {
                     takePlayerDamage(10);
