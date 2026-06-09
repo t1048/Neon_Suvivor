@@ -64,12 +64,20 @@ class Bullet {
         }
     }
     draw() {
+        if (this.marked) return;
+
         ctx.fillStyle = this.isEnemy ? '#ff0000' : '#ffff00';
         if (!this.isEnemy && weapons.scatter && this.maxDist < 2000) ctx.fillStyle = weapons.scatter.color; // Scatter color
 
         ctx.globalAlpha = this.alpha || 1;
         ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
-        const drawSize = (this.isEnemy && this.maxHp > 1) ? this.size * (this.hp / this.maxHp) : this.size;
+        const hpRatio = (this.isEnemy && this.maxHp > 1) ? Math.max(0, this.hp) / this.maxHp : 1;
+        const drawSize = Math.max(0, (this.isEnemy && this.maxHp > 1) ? this.size * hpRatio : this.size);
+        if (drawSize <= 0) {
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 1;
+            return;
+        }
         ctx.beginPath(); ctx.arc(this.x - camera.x, this.y - camera.y, drawSize, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
     }

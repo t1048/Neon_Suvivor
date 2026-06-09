@@ -87,6 +87,7 @@ class BossBase {
             soundManager.playExplosion();
             isBossActive = false;
             soundManager.setBossMode(false);
+            bossBullets = [];
             const boxes = document.querySelectorAll('.stat-box');
             boxes.forEach(b => b.classList.remove('boss-mode'));
             updateUI();
