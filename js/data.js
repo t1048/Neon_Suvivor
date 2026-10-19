@@ -37,7 +37,7 @@ const upgrades = [
         playerSessionMods.player.speedMul *= 1.10; addFloatingText(player.x, player.y, 'SPEED +10%', '#aaffff');
     } },
     { id: 'hp', name: 'Vitality', description: '最大HP+20＆全回復', apply: () => {
-        playerSessionMods.player.maxHpAdd += 20; player.hp = Math.min(player.maxHp + playerSessionMods.player.maxHpAdd, player.hp + 20); addFloatingText(player.x, player.y, '+20 HP', '#ff8888');
+        playerSessionMods.player.maxHpAdd += 20; player.hp = getPlayerStats().maxHp; addFloatingText(player.x, player.y, '+20 HP', '#ff8888');
     } },
     {
         id: 'cdr',
@@ -81,7 +81,7 @@ const upgrades = [
     {
         id: 'vital_strike',
         name: 'Vital Strike',
-        description: 'HP満タン時に攻撃力アップ',
+        description: 'HPが高いほど攻撃力アップ（最大+20%／回）',
         apply: () => {
             player.vitalStrike++;
             addFloatingText(player.x, player.y, "VITAL!", "#00ff88");
@@ -90,7 +90,7 @@ const upgrades = [
     {
         id: 'fortress',
         name: 'Fortress',
-        description: '被ダメージ減少、移動速度低下',
+        description: '被ダメージ-15%、移動速度-10%（軽減上限75%）',
         apply: () => {
             playerSessionMods.player.damageReductionAdd += 0.15; // 15% reduction additive
             playerSessionMods.player.speedMul *= 0.9; // 10% slow

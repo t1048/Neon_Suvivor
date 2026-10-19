@@ -3,6 +3,10 @@ class SoundManager {
     constructor() {
         this.ctx = null;
         this.masterGain = null;
+        this.sfxGain = null;
+        this.sfxVoices = 0;
+        this.sfxLast = new Map();
+        this.noiseBuffers = new Map();
         this.masterVolume = 0.3;
         this.isMuted = false;
         this.isPlayingBGM = false;
@@ -37,11 +41,20 @@ class SoundManager {
     }
 
     init() {
+        if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); return; }
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         this.ctx = new AudioContext();
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = this.masterVolume;
-        this.masterGain.connect(this.ctx.destination);
+        const limiter = this.ctx.createDynamicsCompressor();
+        limiter.threshold.value = -8; limiter.knee.value = 6; limiter.ratio.value = 12;
+        limiter.attack.value = .003; limiter.release.value = .18;
+        this.masterGain.connect(this.ctx.destination); limiter.connect(this.masterGain);
+        this.sfxGain = this.ctx.createGain(); this.sfxGain.gain.value = .9;
+        const compressor = this.ctx.createDynamicsCompressor();
+        compressor.threshold.value = -20; compressor.knee.value = 15; compressor.ratio.value = 4;
+        compressor.attack.value = .003; compressor.release.value = .12;
+        this.sfxGain.connect(compressor); compressor.connect(limiter);
     }
 
     soundTime(allowSystemError = false) {
@@ -50,10 +63,12 @@ class SoundManager {
     }
 
     createNoiseBuffer(duration) {
+        if (this.noiseBuffers.has(duration)) return this.noiseBuffers.get(duration);
         const bufferSize = Math.floor(this.ctx.sampleRate * duration);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        this.noiseBuffers.set(duration, buffer);
         return buffer;
     }
 
@@ -71,6 +86,8 @@ class SoundManager {
             this.masterGain.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
         }
     }
+
+    setMasterVolume(value) { this.setVolume(value); }
 
     setBossMode(enabled) {
         this.isBossMode = enabled;
@@ -148,7 +165,26 @@ class SoundManager {
         this.tempo = this.isBossMode ? baseTempo + 20 : baseTempo;
     }
 
-    playShoot() {
+    // Each voice has a soft attack, a body and a short tail; evolution adds harmonics.
+    sfxVoice(t, duration, frequency, endFrequency, volume, type = 'sine', pan = 0, noise = false) {
+        if (this.sfxVoices >= 48) return;
+        const source = noise ? this.ctx.createBufferSource() : this.ctx.createOscillator();
+        const gain = this.ctx.createGain(), filter = this.ctx.createBiquadFilter();
+        filter.type = noise ? 'bandpass' : 'lowpass'; filter.Q.value = noise ? .7 : .5;
+        filter.frequency.setValueAtTime(noise ? frequency : Math.min(16000, frequency * 6), t);
+        filter.frequency.exponentialRampToValueAtTime(Math.max(40, noise ? endFrequency : endFrequency * 8), t + duration);
+        if (noise) source.buffer = this.createNoiseBuffer(.6);
+        else { source.type = type; source.frequency.setValueAtTime(frequency,t); source.frequency.exponentialRampToValueAtTime(Math.max(20,endFrequency),t+duration); }
+        gain.gain.setValueAtTime(.0001,t); gain.gain.exponentialRampToValueAtTime(Math.max(.0002,volume * 3),t+.004);
+        gain.gain.setValueAtTime(Math.max(.0002,volume * 3),t+.012);
+        gain.gain.exponentialRampToValueAtTime(.0001,t+duration);
+        const panner = this.ctx.createStereoPanner(); panner.pan.value = pan;
+        source.connect(filter); filter.connect(gain); gain.connect(panner); panner.connect(this.sfxGain || this.masterGain);
+        this.sfxVoices++;
+        source.onended = () => { this.sfxVoices--; source.disconnect(); filter.disconnect(); gain.disconnect(); panner.disconnect(); };
+        source.start(t); source.stop(t+duration+.005);
+    }
+    playClassicShoot() {
         const t = this.soundTime();
         if (t == null) return;
         const osc = this.ctx.createOscillator();
@@ -164,8 +200,7 @@ class SoundManager {
         osc.connect(gain); gain.connect(this.masterGain);
         osc.start(); osc.stop(t + 0.1);
     }
-
-    playShotgun() {
+    playClassicShotgun() {
         const t = this.soundTime();
         if (t == null) return;
         // Burst noise/sawtooth for impact
@@ -184,8 +219,7 @@ class SoundManager {
         osc.connect(gain); gain.connect(this.masterGain);
         osc.start(); osc.stop(t + 0.2);
     }
-
-    playBlade() {
+    playClassicBlade() {
         const t = this.soundTime();
         if (t == null) return;
         const osc = this.ctx.createOscillator();
@@ -200,8 +234,7 @@ class SoundManager {
         osc.connect(gain); gain.connect(this.masterGain);
         osc.start(); osc.stop(t + 0.15);
     }
-
-    playRailgun() {
+    playClassicRailgun() {
         const t = this.soundTime();
         if (t == null) return;
         const osc = this.ctx.createOscillator();
@@ -216,8 +249,7 @@ class SoundManager {
         osc.start(t);
         osc.stop(t + 0.2);
     }
-
-    playWhip() {
+    playClassicWhip() {
         const t = this.soundTime();
         if (t == null) return;
         const buffer = this.createNoiseBuffer(0.1);
@@ -235,8 +267,7 @@ class SoundManager {
         noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
         noise.start();
     }
-
-    playThunder() {
+    playClassicThunder() {
         const t = this.soundTime();
         if (t == null) return;
 
@@ -269,8 +300,7 @@ class SoundManager {
         noiseGain.connect(this.masterGain);
         noise.start();
     }
-
-    playExplosion() {
+    playClassicExplosion() {
         const t = this.soundTime();
         if (t == null) return;
         const noise = this.ctx.createBufferSource();
@@ -288,6 +318,48 @@ class SoundManager {
         noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
         noise.start();
     }
+    playWeapon(key, options = {}, phase = 'fire') {
+        const evolved = options.evolved ?? (typeof runBuild === 'object' && !!runBuild.evolved[key]);
+        if (!evolved) {
+            const classic = { gun: 'Shoot', scatter: 'Shotgun', blade: 'Blade', laser: 'Railgun', whip: 'Whip', thunder: 'Thunder' }[key];
+            if (classic) this['playClassic' + classic]();
+            else if ((key === 'bomb' || key === 'mine') && phase === 'impact') this.playClassicExplosion();
+            return;
+        }
+        const t = this.soundTime(); if (t == null) return;
+        const profiles = {
+            gun: [680,'triangle',.14,2600,.035], scatter: [155,'sawtooth',.22,1600,.09],
+            whip: [330,'triangle',.16,3200,.08], blade: [260,'sine',.12,1900,.025],
+            sanctuary: [175,'sine',.3,850,.018], laser: [920,'triangle',.24,4200,.045],
+            bomb: [230,'triangle',.25,700,.07], thunder: [390,'sawtooth',.24,2300,.075],
+            mine: [460,'sine',.12,1700,.025]
+        };
+        const p = profiles[key]; if (!p) return;
+        const id=key+phase, gap=key==='blade'?.09:key==='sanctuary'?.24:.045;
+        if (t-(this.sfxLast.get(id) ?? -Infinity)<gap || this.sfxVoices>40) return;
+        this.sfxLast.set(id,t);
+        const impact=phase==='impact', f=p[0]*(impact?.32:1), tail=impact?.4:p[2];
+        this.sfxVoice(t,tail,f,f*.3,impact?.14:.07,p[1]);
+        this.sfxVoice(t+.006,tail*.6,f*.5,Math.max(25,f*.2),impact?.12:.035,'sine');
+        this.sfxVoice(t,tail*.7,p[3],impact?70:p[3]*.25,p[4], 'sine',0,true);
+        if(evolved)this.sfxVoice(t+.012,tail*.8,f*1.5,f*.7,.024,'triangle',-.25);
+        if(evolved)this.sfxVoice(t+.018,tail,f*2.01,f*.9,.019,'sine',.25);
+        if(evolved)this.sfxVoice(t+.055,tail*.65,f*1.005,f*.5,.022,'triangle',.35);
+    }
+    playGrowth(key, evolved = false) {
+        if (!evolved) return;
+        const t=this.soundTime(true); if(t==null)return;
+        const notes=[261.63,329.63,392,523.25,783.99];
+        notes.forEach((f,i)=>{this.sfxVoice(t+i*.055,.28,f,f*1.003,.055,'sine',(i%2?1:-1)*.2);this.sfxVoice(t+i*.055,.18,f*2,f*2,.012,'triangle');});
+        if(evolved)this.sfxVoice(t,.5,90,35,.1,'sine');
+    }
+    playShoot() { this.playWeapon('gun'); }
+    playShotgun() { this.playWeapon('scatter'); }
+    playBlade() { this.playWeapon('blade'); }
+    playRailgun() { this.playWeapon('laser'); }
+    playWhip() { this.playWeapon('whip'); }
+    playThunder() { this.playWeapon('thunder'); }
+    playExplosion() { this.playWeapon('bomb', {level:1,evolved:false}, 'impact'); }
 
     playBossSpawn() {
         const t = this.soundTime(true);

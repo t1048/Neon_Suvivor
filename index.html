@@ -51,7 +51,7 @@
     </div>
 
     <div class="audio-container" id="audioContainer" style="display:none;">
-        <button class="audio-toggle" id="audioToggle" aria-expanded="false">🔊</button>
+        <button class="audio-toggle" id="audioToggle" aria-label="音量設定" aria-controls="audioPanel" aria-expanded="false">🔊</button>
         <div class="audio-panel" id="audioPanel" aria-hidden="true">
             <button class="mute-btn" id="muteBtn">🔊 MUTE</button>
             <div class="audio-controls" id="audioControls">
@@ -69,12 +69,20 @@
         </div>
     </div>
 
+    <section id="buildSelection" role="dialog" aria-modal="true" aria-labelledby="selectionTitle" hidden>
+        <h1 id="selectionTitle"></h1>
+        <div id="selectionCards"></div>
+        <button id="rerollBtn" type="button"></button>
+        <p>矢印 / WASDで移動・Enter / Spaceで決定・1〜3で直接選択</p>
+    </section>
     <canvas id="gameCanvas"></canvas>
 
     <script src="./js/data.js"></script>
     <script src="./js/audio.js"></script>
     <script src="./js/entities.js"></script>
     <script src="./js/bosses.js"></script>
+    <script src="./js/presentation.js"></script>
+    <script src="./js/gameplay.js"></script>
     <script src="./js/Neon_Suvivor.js"></script>
 </body>
 

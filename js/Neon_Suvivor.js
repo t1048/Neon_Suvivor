@@ -70,6 +70,8 @@ const GAME_STATES = {
     START: 'start',
     PLAYING: 'playing',
     LEVELUP: 'levelup',
+    WEAPONSELECT: 'weaponselect',
+    REWARD: 'reward',
     META: 'meta',
     GAMEOVER: 'gameover'
 };
@@ -98,13 +100,13 @@ volumeSlider.value = initialVolume;
 volumeValue.innerText = `${initialVolume}%`;
 
 function setAudioPanel(isOpen) {
-    audioPanel.classList.toggle('open', !!isOpen);
+    audioContainer.classList.toggle('open', !!isOpen);
     audioPanel.setAttribute('aria-hidden', String(!isOpen));
     audioToggle.setAttribute('aria-expanded', String(!!isOpen));
 }
 
 audioToggle.addEventListener('click', () => {
-    const nextOpen = !audioPanel.classList.contains('open');
+    const nextOpen = !audioContainer.classList.contains('open');
     setAudioPanel(nextOpen);
 });
 
@@ -299,131 +301,12 @@ joystickZone.addEventListener('mousemove', handleJoystickMove);
 joystickZone.addEventListener('mouseup', handleJoystickEnd);
 joystickZone.addEventListener('mouseleave', handleJoystickEnd);
 
-canvas.addEventListener('touchstart', (e) => {
-    if (gameState === "levelup") {
-        e.preventDefault(); // Prevent scrolling
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.touches[0];
-        const clickX = touch.clientX - rect.left;
-        const clickY = touch.clientY - rect.top;
-        
-        const { boxWidth, boxHeight, gap, startX, startY, columns } = getUpgradeLayout();
-
-        for (let i = 0; i < upgradeOptions.length; i++) {
-            const col = i % columns;
-            const row = Math.floor(i / columns);
-            const x = startX + col * (boxWidth + gap);
-            const y = startY + row * (boxHeight + gap);
-            if (clickX >= x && clickX <= x + boxWidth && clickY >= y && clickY <= y + boxHeight) {
-                selectedUpgradeIndex = i;
-                upgradeOptions[i].apply();
-                soundManager.playLevelUp();
-                gameState = "playing";
-                break;
-            }
-        }
-    } else if (gameState === "gameover") {
-        e.preventDefault();
-        overlay.style.display = 'flex';
-        ui.style.display = 'none';
-        audioContainer.style.display = 'none';
-        touchControls.style.display = 'none';
-        gameState = 'start';
-    } else if (gameState === "meta") {
-        e.preventDefault();
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.touches[0];
-        const clickX = touch.clientX - rect.left;
-        const clickY = touch.clientY - rect.top;
-        handleMetaClick(clickX, clickY);
-    }
-}, { passive: false });
-
-canvas.addEventListener('mousedown', (e) => {
-    if (gameState === "gameover") {
-        overlay.style.display = 'flex';
-        ui.style.display = 'none';
-        audioContainer.style.display = 'none';
-        touchControls.style.display = 'none';
-        gameState = 'start';
-    }
-    else if (gameState === "levelup") {
-        const rect = canvas.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-        const { boxWidth, boxHeight, gap, startX, startY, columns } = getUpgradeLayout();
-
-        for (let i = 0; i < upgradeOptions.length; i++) {
-            const col = i % columns;
-            const row = Math.floor(i / columns);
-            const x = startX + col * (boxWidth + gap);
-            const y = startY + row * (boxHeight + gap);
-            if (clickX >= x && clickX <= x + boxWidth && clickY >= y && clickY <= y + boxHeight) {
-                selectedUpgradeIndex = i;
-                upgradeOptions[i].apply();
-                soundManager.playLevelUp();
-                gameState = "playing";
-                break;
-            }
-        }
-    } else if (gameState === "meta") {
-        const rect = canvas.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-        handleMetaClick(clickX, clickY);
-    }
-});
-
-canvas.addEventListener('mousemove', (e) => {
-    if (gameState === "levelup") {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const { boxWidth, boxHeight, gap, startX, startY, columns } = getUpgradeLayout();
-
-        hoveredUpgradeIndex = -1;
-        for (let i = 0; i < upgradeOptions.length; i++) {
-            const col = i % columns;
-            const row = Math.floor(i / columns);
-            const x = startX + col * (boxWidth + gap);
-            const y = startY + row * (boxHeight + gap);
-            if (mouseX >= x && mouseX <= x + boxWidth && mouseY >= y && mouseY <= y + boxHeight) {
-                hoveredUpgradeIndex = i;
-                break;
-            }
-        }
-    } else if (gameState === "meta") {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        handleMetaHover(mouseX, mouseY);
-    } else {
-        hoveredUpgradeIndex = -1;
-        hoveredMetaUpgradeId = null;
-    }
-});
-
-canvas.addEventListener('mouseleave', (e) => {
-    hoveredUpgradeIndex = -1;
-});
-
-window.addEventListener('keydown', (e) => {
-    if (gameState === "levelup") {
-        if (e.key.toLowerCase() === 'a') {
-            selectedUpgradeIndex = (selectedUpgradeIndex - 1 + upgradeOptions.length) % upgradeOptions.length;
-            e.preventDefault();
-        } else if (e.key.toLowerCase() === 'd') {
-            selectedUpgradeIndex = (selectedUpgradeIndex + 1) % upgradeOptions.length;
-            e.preventDefault();
-        } else if (e.key === ' ') {
-            upgradeOptions[selectedUpgradeIndex].apply();
-            soundManager.playLevelUp();
-            gameState = "playing";
-            selectedUpgradeIndex = 0;
-            e.preventDefault();
-        }
-    }
-});
+function handleCanvasAction(x,y) {
+ if (gameState === 'gameover') { overlay.style.display='flex'; ui.style.display='none'; audioContainer.style.display='none'; touchControls.style.display='none'; gameState='start'; }
+ else if(gameState==='meta')handleMetaClick(x,y);
+}
+canvas.addEventListener('pointerdown',e=>{const r=canvas.getBoundingClientRect();handleCanvasAction(e.clientX-r.left,e.clientY-r.top);});
+canvas.addEventListener('mousemove',e=>{if(gameState==='meta'){const r=canvas.getBoundingClientRect();handleMetaHover(e.clientX-r.left,e.clientY-r.top);}});
 
 // --- Entities ---
 const player = {
@@ -649,7 +532,7 @@ function pointInRect(px, py, rect) {
     return px >= rect.x && px <= rect.x + rect.width && py >= rect.y && py <= rect.y + rect.height;
 }
 
-function resetGame() {
+function resetGame(chooseWeapon = gameState === GAME_STATES.PLAYING) {
     soundManager.stopBGM();
     
     weapons = JSON.parse(JSON.stringify(weaponsInitial));
@@ -685,11 +568,11 @@ function resetGame() {
 
     document.querySelectorAll('.stat-box').forEach(b => b.classList.remove('boss-mode'));
 
-    const weaponKeys = Object.keys(weapons);
-    const randomKey = weaponKeys[Math.floor(Math.random() * weaponKeys.length)];
-    player.weapons = [randomKey];
+    player.weapons = [];
     player.weaponCooldowns = {};
-    player.weaponCooldowns[randomKey] = 0;
+    player.contactDamageCooldown = 0; player.invincibleFrames = 0;
+    player.lastMoveAngle = 0; resetBuild();
+    camera.x = player.x - viewWidth / 2; camera.y = player.y - viewHeight / 2;
     // Reset session modifiers each run
     playerSessionMods.player = { speedMul: 1, maxHpAdd: 0, magnetMul: 1, expMulAdd: 0, damageReductionAdd: 0 };
     Object.keys(playerSessionMods.weapons).forEach(k => {
@@ -698,16 +581,17 @@ function resetGame() {
 
     applyMetaUpgrades();
     updateUI();
+    if (chooseWeapon) beginWeaponSelection();
 }
 
-function takePlayerDamage(rawDamage) {
+function takePlayerDamage(rawDamage, cooldown = 30) {
     if (player.contactDamageCooldown > 0 || player.invincibleFrames > 0) return;
 
     // Fortress: Reduce damage
-    const actualDamage = Math.max(1, rawDamage * (1 - player.damageReduction));
+    const actualDamage = Math.max(1, rawDamage * (1 - getPlayerStats().armor));
 
     player.hp -= actualDamage;
-    player.contactDamageCooldown = 30;
+    player.contactDamageCooldown = cooldown;
     addFloatingText(player.x, player.y, `-${Math.floor(actualDamage)}`, "#ff0000");
 
     if (player.hp <= 0 && gameState !== "gameover") {
@@ -720,7 +604,7 @@ function takePlayerDamage(rawDamage) {
 
 function calcCooldownBoost() {
     if (player.adrenaline <= 0) return 1;
-    const missingHpRatio = 1 - (player.hp / player.maxHp);
+    const missingHpRatio = 1 - (player.hp / getPlayerStats().maxHp);
     return 1 + player.adrenaline * missingHpRatio * 0.3;
 }
 
@@ -730,7 +614,7 @@ function getDamageMultiplier() {
 
     // Vital Strike: Bonus at high HP
     if (player.vitalStrike > 0) {
-        const hpRatio = player.hp / player.maxHp;
+        const hpRatio = player.hp / getPlayerStats().maxHp;
         // Max +20% per level at 100% HP
         mult += (player.vitalStrike * 0.2 * hpRatio);
     }
@@ -762,7 +646,6 @@ function spawnBoss() {
 
 function updatePlayer() {
     if (player.contactDamageCooldown > 0) player.contactDamageCooldown = Math.max(0, player.contactDamageCooldown - dtFrames);
-    const cooldownBoost = calcCooldownBoost();
     let dx = 0, dy = 0;
     
     // Keyboard input
@@ -779,181 +662,14 @@ function updatePlayer() {
         player.lastMoveAngle = Math.atan2(dy, dx);
         const l = Math.hypot(dx, dy);
         const moveSpeed = player.speed * (playerSessionMods.player.speedMul || 1);
-        player.x += (dx / l) * moveSpeed; player.y += (dy / l) * moveSpeed;
+        player.x += (dx / l) * moveSpeed * dtFrames; player.y += (dy / l) * moveSpeed * dtFrames;
     }
     player.x = clamp(player.x, 0, world.width);
     player.y = clamp(player.y, 0, world.height);
     camera.x += (player.x - viewWidth / 2 - camera.x) * 0.1;
     camera.y += (player.y - viewHeight / 2 - camera.y) * 0.1;
 
-    // Handle Persistent Weapons (Photon Blade)
-    if (player.weapons.includes('blade')) {
-        const bladeCount = weapons.blade.count || 1;
-        if (rotatingBlades.length < bladeCount) {
-            for (let i = rotatingBlades.length; i < bladeCount; i++) {
-                rotatingBlades.push(new RotatingBlade((i / bladeCount) * Math.PI * 2));
-            }
-        }
-        rotatingBlades.forEach(b => b.update(weapons.blade, cooldownBoost));
-    }
-
-    player.weapons.forEach(key => {
-        if (player.weaponCooldowns[key] > 0) player.weaponCooldowns[key] = Math.max(0, player.weaponCooldowns[key] - cooldownBoost * dtFrames);
-        else {
-            const w = weapons[key];
-            const effectiveFrames = w.cooldown / cooldownBoost;
-
-            if (key !== 'sanctuary' && key !== 'blade' && effectiveFrames < 9) {
-                soundManager.triggerOverheatSequence();
-            }
-
-            const playWeaponSound = (method) => {
-                method.call(soundManager);
-            };
-
-            const dmgMult = getDamageMultiplier();
-
-            if (key === 'gun') {
-                const target = findNearest(w.range);
-                if (target) {
-                    const wm = playerSessionMods.weapons[key] || {};
-                    const effectiveRange = (w.range || 300) * (wm.rangeMul || 1);
-                    const b = new Bullet(player.x, player.y, target.x, target.y, false, effectiveRange);
-                    b._attackBase = (w.attackPower || 1) * (wm.attackMul || 1);
-                    bullets.push(b);
-                    player.weaponCooldowns[key] = (w.cooldown || 1) * (wm.cooldownMul || 1);
-                    playWeaponSound(soundManager.playShoot);
-                }
-            }
-            else if (key === 'scatter') {
-                // Scatter Shot
-                const target = findNearest(w.range);
-                // Aim at target or forward
-                const aimAngle = target ? Math.atan2(target.y - player.y, target.x - player.x) : (player.lastMoveAngle || 0);
-
-                    const wm = playerSessionMods.weapons[key] || {};
-                    for (let i = 0; i < w.count; i++) {
-                        const spread = (Math.random() - 0.5) * w.spread;
-                        const fireAngle = aimAngle + spread;
-                        const tx = player.x + Math.cos(fireAngle) * 100;
-                        const ty = player.y + Math.sin(fireAngle) * 100;
-                        // Pass w.range as maxDist
-                    const effectiveRange = (w.range || 100) * (wm.rangeMul || 1);
-                    // create bullet with effective range and mark the bullet's base damage using session attackMul
-                    const b = new Bullet(player.x, player.y, tx, ty, false, effectiveRange);
-                    b._attackBase = (w.attackPower || 1) * (wm.attackMul || 1);
-                    bullets.push(b);
-                }
-                player.weaponCooldowns[key] = (w.cooldown || 1) * ((wm.cooldownMul || 1));
-                playWeaponSound(soundManager.playShotgun);
-            }
-            else if (key === 'laser') {
-                const target = findNearest(w.range);
-                if (target) {
-                    // Apply session weapon modifiers when computing effects
-                    const wEffective = Object.assign({}, w);
-                    const wm = playerSessionMods.weapons[key] || {};
-                    wEffective.attackPower = (w.attackPower || 1) * (wm.attackMul || 1);
-                    wEffective.cooldown = (w.cooldown || 1) * (wm.cooldownMul || 1);
-                    wEffective.range = (w.range || 0) * (wm.rangeMul || 1);
-                    laserBeams.push({ x1: player.x, y1: player.y, x2: target.x, y2: target.y, life: 10, w: wEffective });
-                    player.weaponCooldowns[key] = w.cooldown;
-                    playWeaponSound(soundManager.playRailgun);
-                    const a = Math.atan2(target.y - player.y, target.x - player.x);
-                    const lx = player.x + Math.cos(a) * wEffective.range;
-                    const ly = player.y + Math.sin(a) * wEffective.range;
-                    enemies.forEach(e => {
-                        if (pointLineDist(e.x, e.y, player.x, player.y, lx, ly) < (e.isBoss ? e.size : e.size)) {
-                            e.takeDamage(wEffective.attackPower * dmgMult);
-                        }
-                    });
-                }
-            }
-            else if (key === 'whip') {
-                whips.push(new WhipHitbox(player.x, player.y, player.lastMoveAngle));
-                whips.push(new WhipHitbox(player.x, player.y, player.lastMoveAngle + Math.PI));
-                player.weaponCooldowns[key] = w.cooldown;
-                playWeaponSound(soundManager.playWhip);
-            }
-            else if (key === 'bomb') { // Plasma Grenade
-                const target = findNearest(w.range);
-                if (target) {
-                    bombs.push(new BombProjectile(player.x, player.y, target.x, target.y));
-                    player.weaponCooldowns[key] = w.cooldown;
-                }
-            }
-            else if (key === 'thunder') {
-                const target = findNearest(w.range);
-                if (target) {
-                    const chain = [target];
-                    let curr = target;
-                    const used = new Set([target]);
-                    for (let i = 0; i < w.chainCount; i++) {
-                        let next = null;
-                        let minD = 200;
-                        enemies.forEach(e => {
-                            if (!used.has(e)) {
-                                const d = Math.hypot(e.x - curr.x, e.y - curr.y);
-                                if (d < minD) { minD = d; next = e; }
-                            }
-                        });
-                        if (next) { chain.push(next); used.add(next); curr = next; }
-                    }
-                    thunders.push(new ThunderStrike(player.x, player.y, chain));
-                    chain.forEach(e => e.takeDamage(w.attackPower * dmgMult));
-                    const thunderDmg = w.attackPower * dmgMult;
-                    chain.forEach(e => {
-                        for (let i = bossBullets.length - 1; i >= 0; i--) {
-                            const eb = bossBullets[i];
-                            if (eb.marked) continue;
-                            if (Math.hypot(eb.x - e.x, eb.y - e.y) < 60 + eb.size) {
-                                eb.hp -= thunderDmg;
-                                if (eb.hp <= 0) {
-                                    eb.marked = true;
-                                    createParticles(eb.x, eb.y, '#ff4444', 5);
-                                }
-                            }
-                        }
-                    });
-                    player.weaponCooldowns[key] = w.cooldown;
-                    playWeaponSound(soundManager.playThunder);
-                }
-            }
-            else if (key === 'sanctuary') {
-                enemies.forEach(e => {
-                    if (Math.hypot(e.x - player.x, e.y - player.y) < w.range + e.size) {
-                        e.takeDamage(w.attackPower * dmgMult);
-                        const a = Math.atan2(e.y - player.y, e.x - player.x);
-                        e.pushX = Math.cos(a) * 6;
-                        e.pushY = Math.sin(a) * 6;
-                    }
-                });
-                const sanctuaryDmg = w.attackPower * dmgMult;
-                for (let i = bossBullets.length - 1; i >= 0; i--) {
-                    const eb = bossBullets[i];
-                    if (eb.marked) continue;
-                    if (Math.hypot(eb.x - player.x, eb.y - player.y) < w.range + eb.size) {
-                        eb.hp -= sanctuaryDmg;
-                        if (eb.hp <= 0) {
-                            eb.marked = true;
-                            createParticles(eb.x, eb.y, '#ff4444', 5);
-                        }
-                    }
-                }
-                player.weaponCooldowns[key] = w.cooldown;
-                    // Spawn particles periodically using integer frame detection
-                    const prevFrame = Math.floor(frameCount - dtFrames);
-                    const currFrame = Math.floor(frameCount);
-                    if (Math.floor(prevFrame / 5) !== Math.floor(currFrame / 5)) {
-                        sanctuaryParticles.push({ x: player.x + (Math.random() - 0.5) * w.range * 1.5, y: player.y + (Math.random() - 0.5) * w.range * 1.5, life: 20 });
-                    }
-            }
-            else if (key === 'mine') {
-                mines.push(new Landmine(player.x, player.y));
-                player.weaponCooldowns[key] = w.cooldown;
-            }
-        }
-    });
+    updateWeapons();
 }
 
 function findNearest(range) {
@@ -964,6 +680,7 @@ function findNearest(range) {
     let minBossDist = range;
 
     enemies.forEach(e => {
+        if (e.marked) return;
         const d = Math.hypot(e.x - player.x, e.y - player.y);
         
         // Ensure within range (and consider enemy size for edge-to-edge detection if desired, 
@@ -1000,60 +717,7 @@ function pointLineDist(px, py, x1, y1, x2, y2) {
     return Math.hypot(px - xx, py - yy);
 }
 
-function generateUpgradeOptions() {
-    upgradeOptions = [];
-    let pool = [...upgrades];
-
-    pool = pool.filter(opt => {
-        if (opt.id === 'adrenaline' && player.adrenaline >= 3) return false;
-        if (opt.id === 'vital_strike' && player.vitalStrike >= 3) return false;
-        return true;
-    });
-
-    const forceWeapon = (wave >= 1 && player.weapons.length === 1);
-
-    const weaponChance = forceWeapon ? 1.0 : 0.6;
-
-    if (player.weapons.length < 3) {
-        if (Math.random() < weaponChance) {
-            const availWeapons = Object.keys(weapons).filter(k => !player.weapons.includes(k));
-            availWeapons.forEach(k => {
-                pool.push({
-                    id: 'new_' + k, name: 'New: ' + weapons[k].name, description: weapons[k].description,
-                    apply: () => { player.weapons.push(k); player.weaponCooldowns[k] = 0; }
-                });
-            });
-        }
-    }
-
-    pool = pool.filter(opt => {
-        const specials = ['adrenaline', 'curse', 'vital_strike', 'fortress'];
-        if (specials.includes(opt.id) && Math.random() > 0.15) return false;
-        return true;
-    });
-
-    const finalOptions = [];
-
-    if (forceWeapon) {
-        const weaponOptions = pool.filter(o => o.id.startsWith('new_'));
-        if (weaponOptions.length > 0) {
-            const idx = Math.floor(Math.random() * weaponOptions.length);
-            finalOptions.push(weaponOptions[idx]);
-            const poolIdx = pool.indexOf(weaponOptions[idx]);
-            if (poolIdx > -1) pool.splice(poolIdx, 1);
-        }
-    }
-
-    if (pool.length === 0) pool.push(upgrades[0]);
-
-    while (finalOptions.length < 3) {
-        if (pool.length === 0) break;
-        const idx = Math.floor(Math.random() * pool.length);
-        finalOptions.push(pool[idx]);
-        pool.splice(idx, 1);
-    }
-    upgradeOptions = finalOptions;
-}
+function generateUpgradeOptions() { upgradeOptions = makeUpgradeOptions(); }
 function saveScore() {
     const previousBest = getHighScores()[0]?.score || 0;
     const result = {
@@ -1095,11 +759,11 @@ function getHighScores() {
 function updateUI() {
     document.getElementById('scoreDisplay').innerText = score;
     document.getElementById('waveNum').innerText = wave;
-    document.getElementById('hpText').innerText = Math.floor(player.hp) + "/" + player.maxHp;
-    document.getElementById('hpBar').style.width = Math.max(0, (player.hp / player.maxHp) * 100) + "%";
+    document.getElementById('hpText').innerText = Math.floor(player.hp) + "/" + getPlayerStats().maxHp;
+    document.getElementById('hpBar').style.width = Math.max(0, (player.hp / getPlayerStats().maxHp) * 100) + "%";
     document.getElementById('levelText').innerText = player.level;
     document.getElementById('expBar').style.width = (player.exp / player.nextLevelExp) * 100 + "%";
-    document.getElementById('weaponDisplay').innerText = player.weapons.map(w => weapons[w].name).join(', ');
+    document.getElementById('weaponDisplay').innerText = player.weapons.map(w => weapons[w].name + ' Lv' + runBuild.levels[w] + (runBuild.evolved[w] ? ' ★' : '')).join(', ');
 }
 
 function drawGridLines(color) {
@@ -1111,7 +775,7 @@ function drawGridLines(color) {
     ctx.stroke();
 }
 
-function animate(timestamp = 0) {
+function simulateFrame(timestamp = 0) {
     // Compute delta-time for frame-rate independence
     if (lastTimestamp === 0) lastTimestamp = timestamp;
     dtSeconds = Math.min((timestamp - lastTimestamp) / 1000, MAX_DT);
@@ -1130,7 +794,7 @@ function animate(timestamp = 0) {
         const bossSpawnModifier = isBossActive ? 1.43 : 1;
         spawnAccumulator += dtSeconds;
         
-        const spawnThreshold = spawnInterval * bossSpawnModifier;
+        const spawnThreshold = spawnInterval * bossSpawnModifier / (timeSeconds % 30 < 5 ? .75 : 1);
         while (spawnAccumulator >= spawnThreshold) {
             spawnAccumulator -= spawnThreshold;
             let enemiesToSpawn = 1;
@@ -1157,7 +821,7 @@ function animate(timestamp = 0) {
             }
 
             if (player.healOnWave > 0) {
-                player.hp = Math.min(player.maxHp, player.hp + player.healOnWave);
+                player.hp = Math.min(getPlayerStats().maxHp, player.hp + player.healOnWave);
                 addFloatingText(player.x, player.y, `+${player.healOnWave} HP`, '#00ff88');
             }
 
@@ -1213,19 +877,15 @@ function animate(timestamp = 0) {
         ctx.fillRect(-camera.x, -camera.y, warningWidth, world.height);
         ctx.fillRect(world.width - camera.x - warningWidth, -camera.y, warningWidth, world.height);
 
-        gems.forEach((g, i) => {
+        forEachReverse(gems, (g, i) => {
             const d = Math.hypot(g.x - player.x, g.y - player.y);
-            if (d < player.magnetRadius) {
+            if (d < getPlayerStats().magnet) {
                 g.x += (player.x - g.x) * 0.1; g.y += (player.y - g.y) * 0.1;
                     if (d < 20) {
                     // Use base persistent expMult and add session exp modifiers (additive)
                     const totalExpMul = (player.expMult || 1) * (1 + (playerSessionMods.player.expMulAdd || 0));
                     player.exp += g.val * totalExpMul * (1 + (player.gemExpBonus || 0));
                     soundManager.playGem(); g.marked = true;
-                    if (player.exp >= player.nextLevelExp) {
-                        player.level++; player.exp -= player.nextLevelExp; player.nextLevelExp = Math.floor(player.nextLevelExp * 1.15);
-                        gameState = "levelup"; generateUpgradeOptions(); updateUI();
-                    }
                     updateUI();
                 }
             }
@@ -1237,14 +897,16 @@ function animate(timestamp = 0) {
         // Weapon Multiplier Logic for Bullets
         const dmgMult = getDamageMultiplier();
 
-        bullets.forEach((b, i) => {
+        forEachReverse(bullets, (b, i) => {
             b.update(); b.draw();
+            if (b.marked) { bullets.splice(i, 1); return; }
             if (!b.isEnemy) {
                 enemies.forEach(e => {
+                    if (b.marked || e.marked || b.hitEnemies?.has(e)) return;
                     if (Math.hypot(e.x - b.x, e.y - b.y) < (e.isBoss ? e.size : e.size) + b.size) {
                         // If bullet has session-modified base attack, use it; otherwise fallback to weapon definitions
                         const baseDmg = (b._attackBase !== undefined) ? b._attackBase : ((weapons.scatter && b.maxDist < 2000) ? weapons.scatter.attackPower : weapons.gun.attackPower);
-                        e.takeDamage(baseDmg * dmgMult); b.marked = true;
+                        weaponImpact(e.x,e.y,b.look); e.takeDamage(baseDmg * dmgMult); b.hitEnemies?.add(e); if (b.pierce > 0) b.pierce--; else b.marked = true;
                     }
                 });
                 if (!b.marked) {
@@ -1265,14 +927,14 @@ function animate(timestamp = 0) {
                 }
             } else {
                 if (Math.hypot(player.x - b.x, player.y - b.y) < player.size + b.size) {
-                    takePlayerDamage(10);
+                    takePlayerDamage(b.damage || 10);
                     b.marked = true;
                 }
             }
             if (b.marked) bullets.splice(i, 1);
         });
 
-        bossBullets.forEach((b, i) => {
+        forEachReverse(bossBullets, (b, i) => {
             b.update(); b.draw();
             if (Math.hypot(player.x - b.x, player.y - b.y) < player.size + b.size) {
                 takePlayerDamage(b.damage || 10);
@@ -1281,98 +943,60 @@ function animate(timestamp = 0) {
             if (b.marked) bossBullets.splice(i, 1);
         });
 
-        bombs.forEach((b, i) => {
+        forEachReverse(bombs, (b, i) => {
             if (b instanceof BombProjectile) {
                 b.update(); b.draw();
                 if (b.marked) bombs.splice(i, 1);
             } else {
-                b.r += 5; b.alpha -= 0.05;
-                ctx.fillStyle = `rgba(255, 100, 0, ${b.alpha})`;
-                ctx.beginPath(); ctx.arc(b.x - camera.x, b.y - camera.y, b.r, 0, 6.28); ctx.fill();
+                b.r = b.look?.evolved ? Math.min(b.maxR, b.r + b.maxR / 20) : b.r + 5; b.alpha -= 0.05;
+                drawWeaponExplosion(b);
                 if (b.alpha <= 0) bombs.splice(i, 1);
             }
         });
 
-        laserBeams.forEach((l, i) => {
-            l.life--;
-            ctx.strokeStyle = '#0ff'; ctx.lineWidth = l.life / 2; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
-            ctx.beginPath();
-            const a = Math.atan2(l.y2 - l.y1, l.x2 - l.x1);
-            ctx.moveTo(l.x1 - camera.x, l.y1 - camera.y);
-            ctx.lineTo((l.x1 + Math.cos(a) * l.w.range) - camera.x, (l.y1 + Math.sin(a) * l.w.range) - camera.y);
-            ctx.stroke(); ctx.shadowBlur = 0;
+        forEachReverse(laserBeams, (l, i) => {
+            l.life -= dtFrames;
+            drawWeaponRail(l);
             if (l.life <= 0) laserBeams.splice(i, 1);
         });
 
-        whips.forEach((w, i) => { w.update(); w.draw(); if (w.life <= 0) whips.splice(i, 1); });
-        thunders.forEach((t, i) => { t.update(); t.draw(); if (t.life <= 0) thunders.splice(i, 1); });
-        mines.forEach((m, i) => { m.update(); m.draw(); if (m.life <= 0) mines.splice(i, 1); });
-        rotatingBlades.forEach(b => b.draw(weapons.blade));
+        forEachReverse(whips, (w, i) => { w.update(); w.draw(); if (w.life <= 0) whips.splice(i, 1); });
+        forEachReverse(thunders, (t, i) => { t.update(); t.draw(); if (t.life <= 0) thunders.splice(i, 1); });
+        forEachReverse(mines, (m, i) => { m.update(); m.draw(); if (m.life <= 0) mines.splice(i, 1); });
+        rotatingBlades.forEach(b => b.draw(getWeaponStats('blade')));
 
-        sanctuaryParticles.forEach((p, i) => {
+        forEachReverse(sanctuaryParticles, (p, i) => {
           p.life = Math.max(0, p.life - dtFrames);
-            ctx.fillStyle = `rgba(0, 255, 255, ${p.life / 20})`;
+            ctx.fillStyle = getWeaponLook('sanctuary').color;
+            ctx.globalAlpha = p.life / 20;
             ctx.fillRect(p.x - camera.x, p.y - camera.y, 4, 4);
+            ctx.globalAlpha = 1;
             if (p.life <= 0) sanctuaryParticles.splice(i, 1);
         });
-        if (player.weapons.includes('sanctuary')) {
-            ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
-            ctx.beginPath(); ctx.arc(player.x - camera.x, player.y - camera.y, weapons.sanctuary.range, 0, 6.28); ctx.stroke();
-        }
+        if (player.weapons.includes('sanctuary')) drawVoidField();
+        drawWeaponEffects();
 
-        enemies.forEach((e, i) => { e.update(); e.draw(); if (e.marked) enemies.splice(i, 1); });
+        updateBuildEffects();
+        forEachReverse(enemies, (e, i) => { if (!e.marked && gameState === 'playing') e.update(); if (!e.marked) e.draw(); if(e.marked) enemies.splice(i,1); });
 
         ctx.fillStyle = player.color; ctx.shadowBlur = 15; ctx.shadowColor = player.color;
         ctx.beginPath(); ctx.arc(player.x - camera.x, player.y - camera.y, player.size, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
 
-        floatingTexts.forEach((t, i) => { t.update(); t.draw(); if (t.life <= 0) floatingTexts.splice(i, 1); });
-        particles.forEach((p, i) => { p.update(); p.draw(); if (p.life <= 0) particles.splice(i, 1); });
+        forEachReverse(floatingTexts, (t, i) => { t.update(); t.draw(); if (t.life <= 0) floatingTexts.splice(i, 1); });
+        forEachReverse(particles, (p, i) => { p.update(); p.draw(); if (p.life <= 0) particles.splice(i, 1); });
 
         ctx.restore();
+        processBuildQueue();
 
-    } else if (gameState === "levelup") {
+    } else if ([GAME_STATES.LEVELUP, GAME_STATES.WEAPONSELECT, GAME_STATES.REWARD].includes(gameState)) {
         ctx.save();
         ctx.scale(camera.zoom, camera.zoom);
         drawGridLines('#333');
         enemies.forEach(e => e.draw());
-        rotatingBlades.forEach(b => b.draw(weapons.blade));
+        rotatingBlades.forEach(b => b.draw(getWeaponStats('blade')));
         ctx.fillStyle = player.color; ctx.beginPath(); ctx.arc(player.x - camera.x, player.y - camera.y, player.size, 0, 6.28); ctx.fill();
         ctx.restore();
 
-        // Overlay should cover css logical pixels
-        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0, 0, cssWidth, cssHeight);
-        const { boxWidth, boxHeight, gap, startX, startY, columns, responsiveScale, isPortrait } = getUpgradeLayout();
-
-        // Landscape-optimized font sizes
-        const titleFontSize = 40 * responsiveScale;
-        const nameFontSize = 18 * responsiveScale;
-        const bodyFontSize = 14 * responsiveScale;
-
-        ctx.fillStyle = "#fff"; ctx.font = `bold ${titleFontSize}px Arial`; ctx.textAlign = "center";
-        ctx.fillText("LEVEL UP", cssWidth / 2, Math.max(40, 70 * responsiveScale));
-
-        upgradeOptions.forEach((opt, i) => {
-            const col = i % columns;
-            const row = Math.floor(i / columns);
-            const x = startX + col * (boxWidth + gap);
-            const y = startY + row * (boxHeight + gap);
-            const grad = ctx.createLinearGradient(x, y, x, y + boxHeight);
-            grad.addColorStop(0, '#222'); grad.addColorStop(1, '#111');
-            ctx.fillStyle = grad; ctx.fillRect(x, y, boxWidth, boxHeight);
-
-            if (i === selectedUpgradeIndex || i === hoveredUpgradeIndex) {
-                ctx.strokeStyle = '#ffaa00'; ctx.lineWidth = 4; ctx.strokeRect(x - 2, y - 2, boxWidth + 4, boxHeight + 4);
-            }
-            ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, boxWidth, boxHeight);
-
-            ctx.fillStyle = '#00aaff'; ctx.font = `bold ${nameFontSize}px Arial`;
-            ctx.fillText(opt.name, x + boxWidth / 2, y + 40 * responsiveScale);
-
-            ctx.fillStyle = '#ccc'; ctx.font = `${bodyFontSize}px Arial`;
-            const textY = y + 100 * responsiveScale;
-            const lineHeight = 20 * responsiveScale;
-            wrapText(ctx, opt.description, x + boxWidth / 2, textY, boxWidth - 20, lineHeight);
-        });
     } else if (gameState === "meta") {
         drawMetaScreen();
     } else if (gameState === "gameover") {
@@ -1531,7 +1155,6 @@ function animate(timestamp = 0) {
         }
     }
 
-    requestAnimationFrame(animate);
 }
 
 function createParticles(x, y, color, count) {
@@ -1560,3 +1183,11 @@ function addFloatingText(x, y, text, color) {
 }
 
 resetGame();
+
+let simulationClock = 1000, simulationRemainder = 0, displayTimestamp = null;
+function animate(timestamp = 0) {
+ if(displayTimestamp === null)displayTimestamp=timestamp;
+ simulationRemainder += Math.min(Math.max(0,(timestamp-displayTimestamp)/1000), MAX_DT); displayTimestamp=timestamp;
+ while(simulationRemainder >= 1/60-1e-9){simulationRemainder-=1/60;simulationClock+=1000/60;simulateFrame(simulationClock);}
+ requestAnimationFrame(animate);
+}

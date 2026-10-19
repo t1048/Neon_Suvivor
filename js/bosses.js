@@ -71,6 +71,7 @@ class BossBase {
     }
 
     takeDamage(dmg) {
+        if (this.marked) return;
         this.hp -= dmg;
         totalDamageDealt += dmg;
         this.flash = 3;
@@ -81,7 +82,8 @@ class BossBase {
             for (let i = 0; i < 20; i++) {
                 gems.push({ x: this.x + (Math.random() - 0.5) * 100, y: this.y + (Math.random() - 0.5) * 100, val: 50, size: 8, marked: false });
             }
-            player.hp = Math.min(player.maxHp, player.hp + 50);
+            player.hp = Math.min(getPlayerStats().maxHp, player.hp + 50);
+            runBuild.bossRewards++;
             addFloatingText(player.x, player.y, "+50 HP", "#00ff00");
             createParticles(this.x, this.y, this.color, 50);
             soundManager.playExplosion();
@@ -655,13 +657,7 @@ class BossTank extends BossBase {
                 const by = this.y + Math.sin(this.beamAngle) * beamLength;
 
                 if (pointLineDist(player.x, player.y, this.x, this.y, bx, by) < 40) {
-                    if (player.contactDamageCooldown <= 0 && player.invincibleFrames <= 0) {
-                        player.hp -= 2 * (1 - player.damageReduction);
-                        player.contactDamageCooldown = 5;
-                        addFloatingText(player.x, player.y, "-2", "#ff0000");
-                        if (player.hp <= 0) gameState = "gameover";
-                        updateUI();
-                    }
+                    takePlayerDamage(2, 5);
                 }
 
                     // Spawn particles every 4 frames equivalent (0.067 seconds)
@@ -776,44 +772,8 @@ function createRandomBoss(wave) {
 
 class Enemy {
     constructor() {
-        const edge = Math.floor(Math.random() * 4);
-        const d = Math.max(canvas.width, canvas.height) / 2 + 50;
-        let sx = player.x, sy = player.y;
-        if (edge == 0) sy -= d; if (edge == 1) sx += d; if (edge == 2) sy += d; if (edge == 3) sx -= d;
-        sx += (Math.random() - 0.5) * 500; sy += (Math.random() - 0.5) * 500;
-        this.x = clamp(sx, 0, world.width);
-        this.y = clamp(sy, 0, world.height);
-
-        const wavePattern = wave % 6;
-        const r = Math.random() * 100;
-        let type = 'normal';
-
-        // New enemy types (checked first, higher wave = more types)
-        if (wave >= 6 && r > 93) {
-            type = 'teleporter';
-        } else if (wave >= 5 && r > 90) {
-            type = 'sniper';
-        } else if (wave >= 4 && r > 87) {
-            type = 'splitter';
-        } else if (wave >= 3 && r > 92) {
-            type = 'orbiter';
-        } else if (wave >= 3 && r > 88) {
-            type = 'bomber';
-        } else if (wavePattern === 0) {
-            if (r > 90) type = 'runner'; else if (r > 70) type = 'tank'; else if (r > 55) type = 'shooter';
-        } else if (wavePattern === 1) {
-            if (r > 40) type = 'tank'; else if (r > 85) type = 'runner'; else if (r > 70) type = 'ghost';
-        } else if (wavePattern === 2) {
-            if (r > 30) type = 'runner'; else if (r > 80) type = 'tank'; else if (r > 60) type = 'shooter';
-        } else if (wavePattern === 3) {
-            if (r > 95) type = 'runner'; else if (r > 90) type = 'tank'; else if (r > 75) type = 'ghost';
-        } else if (wavePattern === 4) {
-            if (r > 65) type = 'runner'; else if (r > 35) type = 'tank'; else if (r > 20) type = 'shooter'; else if (r > 10) type = 'ghost';
-        } else {
-            const types = ['normal', 'tank', 'runner', 'shooter', 'ghost'];
-            type = types[Math.floor(Math.random() * types.length)];
-        }
-
+        const position = enemySpawnPosition(); this.x = position.x; this.y = position.y;
+        const type = chooseEnemyType();
         const t = enemyTypes[type];
         this.type = type;
         this.shape = t.shape;
@@ -855,6 +815,9 @@ class Enemy {
         if (!this.trail) this.trail = [];
     }
     update() {
+        if (this.marked) return;
+        const originalSpeed = this.speed;
+        if (player.weapons.includes('sanctuary')) { const field = getWeaponStats('sanctuary'); if (field.evolved && Math.hypot(this.x-player.x,this.y-player.y)<field.range+this.size) this.speed *= 1 - field.slow; }
         this.pushX *= 0.8; this.pushY *= 0.8;
         if (this.flash > 0) this.flash = Math.max(0, this.flash - dtFrames);
 
@@ -990,6 +953,7 @@ class Enemy {
             this.trail = this.trail.filter(t => t.life > 0);
         }
 
+        this.speed = originalSpeed;
         // Contact damage (except bomber which explodes)
         if (this.type !== 'bomber') {
             if (Math.hypot(player.x - this.x, player.y - this.y) < player.size + this.size) {
@@ -1068,6 +1032,7 @@ class Enemy {
         }
     }
     takeDamage(dmg) {
+        if (this.marked) return;
         this.hp -= dmg; totalDamageDealt += dmg; this.flash = 3;
         const a = Math.atan2(this.y - player.y, this.x - player.x);
         this.pushX = Math.cos(a) * 2; this.pushY = Math.sin(a) * 2;
