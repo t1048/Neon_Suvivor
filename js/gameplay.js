@@ -99,6 +99,18 @@ const enemyUnlocks = {
     teleporter: 6
 };
 const waveThemes = [[], ['tank'], ['runner'], ['ghost', 'orbiter', 'teleporter'], ['shooter', 'sniper'], []];
+// 敵は自機の基準速度を超えない（俊足型のみ同速まで）。
+const PLAYER_BASE_SPEED = 4.0;
+const ENEMY_SPEED_CAP = .85, FAST_ENEMY_SPEED_CAP = 1.0;
+function enemyMoveSpeed(spdMul) {
+    let base = 1.5 + Math.log(wave + 1) * 0.4;
+    if (wave > 35) base += (wave - 35) * 0.05;
+    return Math.min(base * spdMul, PLAYER_BASE_SPEED * (spdMul > 1 ? FAST_ENEMY_SPEED_CAP : ENEMY_SPEED_CAP));
+}
+// 初回ボス (Wave 5) は単体武器でも倒せるよう HP を抑え、Wave 10 以降は等倍。
+function bossHpScale(bossWave) {
+    return Math.min(1, .6 + bossWave * .04);
+}
 const runBuild = {
     levels: {},
     evolved: {},
@@ -209,9 +221,9 @@ function commonOption(up) {
     const next = {
         atk: (w.attackPower*1.2).toFixed(1),
         cdr: (w.cooldown*.9/60).toFixed(2)+'秒',
-        rng: Math.round(w.range*1.2),
+        rng: Math.round(w.range*1.25),
         hp: s.maxHp+20,
-        mag: Math.round(s.magnet*1.3),
+        mag: Math.round(s.magnet*1.4),
         spd: (s.speed*1.1).toFixed(2),
         exp: Math.round((1+playerSessionMods.player.expMulAdd+.12)*100)+'%',
         fortress: Math.round(Math.min(.75,s.armor+.15)*100)+'%',
@@ -331,7 +343,7 @@ function processBuildQueue() {
     else if (player.exp >= player.nextLevelExp) {
         player.exp -= player.nextLevelExp;
         player.level++;
-        player.nextLevelExp = Math.floor(player.nextLevelExp * 1.15);
+        player.nextLevelExp = Math.floor(player.nextLevelExp * 1.10);
         showSelection('level', makeUpgradeOptions());
         updateUI();
     }
@@ -414,19 +426,29 @@ function hitArea(x, y, radius, damage, look = getWeaponLook('bomb')) {
     });
 }
 function fireRail(x,y,angle,w,mul=1) {
-    const tx = x + Math.cos(angle)*w.range,
-    ty = y + Math.sin(angle)*w.range;
+    const range = w.range;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    const tx = x + cos * range, ty = y + sin * range;
+    const halfW = w.beamWidth / 2;
+    const dmg = w.attackPower * getDamageMultiplier() * mul;
+    const look = getWeaponLook('laser');
     enemies.forEach(e => {
-        if (!e.marked && pointLineDist(e.x,e.y,x,y,tx,ty) < e.size+w.beamWidth/2) { weaponImpact(e.x,e.y,getWeaponLook('laser')); e.takeDamage(w.attackPower*getDamageMultiplier()*mul); }
+        if (e.marked) return;
+        const along = (e.x - x) * cos + (e.y - y) * sin;
+        if (along < -e.size || along > range + e.size) return;
+        if (pointLineDist(e.x, e.y, x, y, tx, ty) >= e.size + halfW) return;
+        weaponImpact(e.x, e.y, look);
+        e.takeDamage(dmg);
     });
     laserBeams.push({
-        x1:x,
-        y1:y,
-        x2:tx,
-        y2:ty,
-        life:10,
+        x1: x,
+        y1: y,
+        x2: tx,
+        y2: ty,
+        range,
+        life: 10,
         w,
-        look: getWeaponLook('laser')
+        look
     });
 }
 function fireWeapon(key,w) {

@@ -17,7 +17,7 @@ const weaponsInitial = {
     scatter: { name: 'Scatter Shot', color: '#ffaa00', description: '近距離に拡散弾を発射する。', attackPower: 9, range: 180, cooldown: 30, count: 5, spread: 0.6 },
     whip: { name: 'Nano Whip', color: '#ff00ff', description: '左右両方を同時に攻撃する。', attackPower: 45, range: 180, cooldown: 35 },
     blade: { name: 'Photon Blade', color: '#00ffaa', description: '自機の周囲を回転するプラズマブレード。', attackPower: 25, range: 100, cooldown: 0, count: 1, rotSpeed: 0.08 },
-    sanctuary: { name: 'Void Field', color: '#00ffff', description: '範囲内の敵に継続ダメージを与える。', attackPower: 1.5, range: 110, cooldown: 12 },
+    sanctuary: { name: 'Void Field', color: '#00ffff', description: '範囲内の敵に継続ダメージを与える。', attackPower: 2.5, range: 110, cooldown: 12 },
     laser: { name: 'Railgun', color: '#ff0000', description: '一直線上の敵を貫通するレーザー。', attackPower: 20, range: 480, cooldown: 35 },
     bomb: { name: 'Plasma Grenade', color: '#ff8800', description: '爆発するグレネードを投げる。', attackPower: 40, range: 250, cooldown: 60, explosionRadius: 100 },
     thunder: { name: 'Tesla Coil', color: '#ffff88', description: '敵に連鎖する雷を放つ。', attackPower: 22, range: 360, cooldown: 45, chainCount: 4 },
@@ -51,13 +51,13 @@ const upgrades = [
     {
         id: 'rng',
         name: 'Scope',
-        description: '射程+20%、爆発範囲+10%',
+        description: '射程+25%、爆発範囲+15%',
         apply: () => {
-            playerSessionMods.weaponsApplyForEach(k => { playerSessionMods.weapons[k].rangeMul *= 1.20; playerSessionMods.weapons[k].explosionMul *= 1.10; playerSessionMods.weapons[k].blastMul *= 1.10; });
+            playerSessionMods.weaponsApplyForEach(k => { playerSessionMods.weapons[k].rangeMul *= 1.25; playerSessionMods.weapons[k].explosionMul *= 1.15; playerSessionMods.weapons[k].blastMul *= 1.15; });
             addFloatingText(player.x, player.y, 'SCOPE UP!', '#00ffff');
         }
     },
-    { id: 'mag', name: 'Magnet', description: 'アイテム吸収範囲+30%', apply: () => { playerSessionMods.player.magnetMul *= 1.3; addFloatingText(player.x, player.y, 'MAGNET +30%', '#aaffaa'); } },
+    { id: 'mag', name: 'Magnet', description: 'アイテム吸収範囲+40%', apply: () => { playerSessionMods.player.magnetMul *= 1.4; addFloatingText(player.x, player.y, 'MAGNET +40%', '#aaffaa'); } },
     { id: 'exp', name: 'Learning', description: '獲得経験値+12%', apply: () => { playerSessionMods.player.expMulAdd += 0.12; addFloatingText(player.x, player.y, '+12% EXP', '#ffd2ff'); } },
     {
         id: 'curse',

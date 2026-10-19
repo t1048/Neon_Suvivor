@@ -72,24 +72,27 @@ function drawWeaponExplosion(b) {
     ctx.restore();
 }
 function drawWeaponRail(l) {
+    const sx = l.x1 - camera.x, sy = l.y1 - camera.y;
+    const ex = l.x2 - camera.x, ey = l.y2 - camera.y;
+    const a = Math.atan2(l.y2 - l.y1, l.x2 - l.x1);
     if (!l.look?.evolved) {
         ctx.strokeStyle = '#0ff'; ctx.lineWidth = l.life / 2; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
         ctx.beginPath();
-        const a = Math.atan2(l.y2 - l.y1, l.x2 - l.x1);
-        ctx.moveTo(l.x1 - camera.x, l.y1 - camera.y);
-        ctx.lineTo(l.x1 + Math.cos(a) * l.w.range - camera.x, l.y1 + Math.sin(a) * l.w.range - camera.y);
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
         ctx.stroke(); ctx.shadowBlur = 0;
         return;
     }
-    const v=l.look || getWeaponLook('laser'), a=Math.atan2(l.y2-l.y1,l.x2-l.x1), x=l.x1-camera.x,y=l.y1-camera.y;
-    const end={x:x+Math.cos(a)*l.w.range,y:y+Math.sin(a)*l.w.range};
-    ctx.save();ctx.shadowColor=v.color;ctx.shadowBlur=v.glow;
-    strokePath([{x,y},end],v.color,l.w.beamWidth*(1+v.tier*.4),Math.max(0,l.life/10));
-    strokePath([{x,y},end],v.accent,1+v.tier,Math.max(0,l.life/10));
-    if(v.tier>=1){const offset=5+v.tier*2,nx=-Math.sin(a)*offset,ny=Math.cos(a)*offset;
-        for(const sign of [-1,1])strokePath([{x:x+nx*sign,y:y+ny*sign},{x:end.x+nx*sign,y:end.y+ny*sign}],v.color,1,l.life/20);
+    const v = l.look || getWeaponLook('laser');
+    const end = { x: ex, y: ey };
+    ctx.save(); ctx.shadowColor = v.color; ctx.shadowBlur = v.glow;
+    strokePath([{ x: sx, y: sy }, end], v.color, l.w.beamWidth * (1 + v.tier * .4), Math.max(0, l.life / 10));
+    strokePath([{ x: sx, y: sy }, end], v.accent, 1 + v.tier, Math.max(0, l.life / 10));
+    if (v.tier >= 1) {
+        const offset = 5 + v.tier * 2, nx = -Math.sin(a) * offset, ny = Math.cos(a) * offset;
+        for (const sign of [-1, 1]) strokePath([{ x: sx + nx * sign, y: sy + ny * sign }, { x: end.x + nx * sign, y: end.y + ny * sign }], v.color, 1, l.life / 20);
     }
-    if(v.evolved){ctx.strokeStyle=v.accent;ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,15+(10-l.life)*2,a-Math.PI/2,a+Math.PI/2);ctx.stroke();}
+    if (v.evolved) { ctx.strokeStyle = v.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, 15 + (10 - l.life) * 2, a - Math.PI / 2, a + Math.PI / 2); ctx.stroke(); }
     ctx.restore();
 }
 function drawVoidField() {

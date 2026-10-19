@@ -30,6 +30,8 @@ Globals are shared; files depend on each other via global scope.
 - **All state is global.** `gameState`, `player`, `enemies`, `bullets`, `bosses`, `camera`, `frameCount`, etc. are module-level variables.
 - **Array mutation via `splice`.** Dead entities are marked (`this.marked = true`), then spliced out. Follow this pattern; do not switch to filter-without-splice.
 - **Frame timing:** fixed 60Hz simulation driven by requestAnimationFrame; `frameCount` counts simulation ticks and `timeSeconds` accumulates seconds. Wave advances every 30 seconds. Boss spawns at `wave % 5 === 0`.
+- **Balance helpers (`gameplay.js`):** enemy speed comes from `enemyMoveSpeed(spdMul)` (capped at 0.85× / 1.0× of `PLAYER_BASE_SPEED` for fast types); boss HP is multiplied by `bossHpScale(wave)` (0.8 at wave 5, 1.0 from wave 10). Use these instead of inlining formulas.
+- **Audio routing:** weapon SFX (`playWeapon`, `playClassic*`, `sfxVoice`) go through `sfxOut()` (`sfxGain` → compressor → limiter). BGM and UI sounds (level up, gem, boss spawn) still connect to `masterGain` directly.
 - **World size:** 3000×3000. Camera follows player with zoom that varies by viewport (0.6 landscape mobile, 0.75 portrait mobile, 0.85 desktop).
 - **Canvas uses `devicePixelRatio`.** Drawing uses CSS pixels (`cssWidth`/`cssHeight`); world drawing accounts for `camera.zoom`.
 - **`gameState` values:** `"start"`, `"playing"`, `"levelup"`, `"weaponselect"`, `"reward"`, `"meta"`, `"gameover"` (see `GAME_STATES` constant).

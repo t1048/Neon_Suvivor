@@ -80,6 +80,10 @@ class Bullet {
             return;
         }
         ctx.beginPath(); ctx.arc(this.x - camera.x, this.y - camera.y, drawSize, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
+        if (this.isEnemy) {
+            // 敵弾はネオン系の武器エフェクトに埋もれないよう白縁を付ける。
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.stroke();
+        }
         ctx.globalAlpha = 1;
     }
 }

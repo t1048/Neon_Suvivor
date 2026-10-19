@@ -622,6 +622,18 @@ function getDamageMultiplier() {
     return mult;
 }
 
+// 白い外周と回転する破線リングで、密集時も自機の位置を見失わないようにする。
+function drawPlayerOutline() {
+    const sx = player.x - camera.x, sy = player.y - camera.y;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx, sy, player.size, 0, 6.28); ctx.stroke();
+    ctx.save();
+    ctx.globalAlpha = .55; ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 6]); ctx.lineDashOffset = -frameCount * .5;
+    ctx.beginPath(); ctx.arc(sx, sy, player.size + 7, 0, 6.28); ctx.stroke();
+    ctx.restore();
+}
+
 function getWaveColor(alpha = 1.0) {
     const progress = Math.min(wave, 30) / 30;
     const r = Math.floor(0 + progress * 255);
@@ -981,6 +993,7 @@ function simulateFrame(timestamp = 0) {
 
         ctx.fillStyle = player.color; ctx.shadowBlur = 15; ctx.shadowColor = player.color;
         ctx.beginPath(); ctx.arc(player.x - camera.x, player.y - camera.y, player.size, 0, 6.28); ctx.fill(); ctx.shadowBlur = 0;
+        drawPlayerOutline();
 
         forEachReverse(floatingTexts, (t, i) => { t.update(); t.draw(); if (t.life <= 0) floatingTexts.splice(i, 1); });
         forEachReverse(particles, (p, i) => { p.update(); p.draw(); if (p.life <= 0) particles.splice(i, 1); });
@@ -995,6 +1008,7 @@ function simulateFrame(timestamp = 0) {
         enemies.forEach(e => e.draw());
         rotatingBlades.forEach(b => b.draw(getWeaponStats('blade')));
         ctx.fillStyle = player.color; ctx.beginPath(); ctx.arc(player.x - camera.x, player.y - camera.y, player.size, 0, 6.28); ctx.fill();
+        drawPlayerOutline();
         ctx.restore();
 
     } else if (gameState === "meta") {

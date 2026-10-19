@@ -18,6 +18,11 @@ function loadEnemyImages() {
     });
 }
 
+// 赤背景に緑だと色覚によって区別しにくいため、暗い背景＋残量で色を変える。
+function hpBarColor(ratio) {
+    return ratio > .5 ? '#33ff66' : ratio > .25 ? '#ffd23f' : '#ff3355';
+}
+
 // --- Boss Base Class ---
 class BossBase {
     constructor(wave) {
@@ -27,7 +32,7 @@ class BossBase {
         this.x = clamp(this.x, 100, world.width - 100);
         this.y = clamp(this.y, 100, world.height - 100);
 
-        this.hp = enemyBaseHp * 50 * (enemyGlobalHpMul || 1);
+        this.hp = enemyBaseHp * 50 * bossHpScale(wave) * (enemyGlobalHpMul || 1);
         this.maxHp = this.hp;
         this.size = 40;
         this.speed = 2.5;
@@ -63,8 +68,8 @@ class BossBase {
 
     drawHpBar(sx, sy) {
         const hpPercent = this.hp / this.maxHp;
-        ctx.fillStyle = 'red'; ctx.fillRect(sx - 40, sy - 60, 80, 8);
-        ctx.fillStyle = '#0f0'; ctx.fillRect(sx - 40, sy - 60, 80 * hpPercent, 8);
+        ctx.fillStyle = '#222'; ctx.fillRect(sx - 40, sy - 60, 80, 8);
+        ctx.fillStyle = hpBarColor(hpPercent); ctx.fillRect(sx - 40, sy - 60, 80 * hpPercent, 8);
         ctx.strokeStyle = '#fff'; ctx.strokeRect(sx - 40, sy - 60, 80, 8);
         ctx.fillStyle = this.color; ctx.font = 'bold 18px Arial'; ctx.textAlign = 'center';
         ctx.fillText(this.bossType.toUpperCase(), sx, sy - 55);
@@ -136,7 +141,7 @@ class BossCharger extends BossBase {
         super(wave);
         this.bossType = 'charger';
         this.color = '#ff6600';
-        this.hp = enemyBaseHp * 50 * (enemyGlobalHpMul || 1);
+        this.hp = enemyBaseHp * 50 * bossHpScale(wave) * (enemyGlobalHpMul || 1);
         this.maxHp = this.hp;
         this.size = 50;
         this.speed = 1.5;
@@ -257,7 +262,7 @@ class BossSniper extends BossBase {
         super(wave);
         this.bossType = 'sniper';
         this.color = '#00ff88';
-        this.hp = enemyBaseHp * 28 * (enemyGlobalHpMul || 1);
+        this.hp = enemyBaseHp * 28 * bossHpScale(wave) * (enemyGlobalHpMul || 1);
         this.maxHp = this.hp;
         this.size = 35;
         this.speed = 1.8;
@@ -363,7 +368,7 @@ class BossTeleporter extends BossBase {
         super(wave);
         this.bossType = 'phantom';
         this.color = '#aa00ff';
-        this.hp = enemyBaseHp * 40 * (enemyGlobalHpMul || 1);
+        this.hp = enemyBaseHp * 40 * bossHpScale(wave) * (enemyGlobalHpMul || 1);
         this.maxHp = this.hp;
         this.size = 35;
         this.speed = 2.0;
@@ -480,7 +485,7 @@ class BossSummoner extends BossBase {
         super(wave);
         this.bossType = 'summoner';
         this.color = '#ffaa00';
-        this.hp = enemyBaseHp * 45 * (enemyGlobalHpMul || 1);
+        this.hp = enemyBaseHp * 45 * bossHpScale(wave) * (enemyGlobalHpMul || 1);
         this.maxHp = this.hp;
         this.size = 45;
         this.speed = 1.5;
@@ -589,7 +594,7 @@ class BossTank extends BossBase {
         super(wave);
         this.bossType = 'juggernaut';
         this.color = '#888888';
-        this.hp = enemyBaseHp * 80 * (enemyGlobalHpMul || 1);
+        this.hp = enemyBaseHp * 80 * bossHpScale(wave) * (enemyGlobalHpMul || 1);
         this.maxHp = this.hp;
         this.size = 55;
         this.speed = 1.0;
@@ -780,9 +785,7 @@ class Enemy {
         this.hp = enemyBaseHp * t.hpMul * (enemyGlobalHpMul || 1);
         this.maxHp = this.hp;
 
-        let baseSpeed = 1.5 + Math.log(wave + 1) * 0.4;
-        if (wave > 35) baseSpeed += (wave - 35) * 0.15;
-        this.speed = baseSpeed * t.spdMul;
+        this.speed = enemyMoveSpeed(t.spdMul);
         this.color = t.color; this.size = 12;
         this.flash = 0; this.marked = false;
         this.pushX = 0; this.pushY = 0;
@@ -1027,8 +1030,9 @@ class Enemy {
 
         // HP bar
         if (this.hp < this.maxHp) {
-            ctx.fillStyle = 'red'; ctx.fillRect(sx - 10, sy - 20, 20, 3);
-            ctx.fillStyle = '#0f0'; ctx.fillRect(sx - 10, sy - 20, 20 * (this.hp / this.maxHp), 3);
+            const ratio = this.hp / this.maxHp;
+            ctx.fillStyle = '#222'; ctx.fillRect(sx - 10, sy - 20, 20, 3);
+            ctx.fillStyle = hpBarColor(ratio); ctx.fillRect(sx - 10, sy - 20, 20 * ratio, 3);
         }
     }
     takeDamage(dmg) {
@@ -1053,7 +1057,7 @@ class Enemy {
                     mini.hp = enemyBaseHp * 0.5 * (enemyGlobalHpMul || 1);
                     mini.maxHp = mini.hp;
                     mini.size = 8;
-                    mini.speed = this.speed * 1.5;
+                    mini.speed = enemyMoveSpeed(enemyTypes.splitter.spdMul * 1.5);
                     mini.color = this.color;
                     mini.x = this.x + (Math.random() - 0.5) * 30;
                     mini.y = this.y + (Math.random() - 0.5) * 30;

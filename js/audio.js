@@ -184,20 +184,19 @@ class SoundManager {
         source.onended = () => { this.sfxVoices--; source.disconnect(); filter.disconnect(); gain.disconnect(); panner.disconnect(); };
         source.start(t); source.stop(t+duration+.005);
     }
+    sfxOut() { return this.sfxGain || this.masterGain; }
     playClassicShoot() {
         const t = this.soundTime();
         if (t == null) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.type = 'triangle';
-        // Add random pitch variation (detune) for natural feel
+                // Add random pitch variation (detune) for natural feel
         const detune = 1.0 + (Math.random() * 0.1 - 0.05);
         osc.frequency.setValueAtTime((this.isBossMode ? 900 : 800) * detune, t);
         osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
         gain.gain.setValueAtTime(0.2, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-        osc.connect(gain); gain.connect(this.masterGain);
+        osc.connect(gain); gain.connect(this.sfxOut());
         osc.start(); osc.stop(t + 0.1);
     }
     playClassicShotgun() {
@@ -206,9 +205,7 @@ class SoundManager {
         // Burst noise/sawtooth for impact
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.type = 'sawtooth';
-        
+                
         const detune = 1.0 + (Math.random() * 0.2 - 0.1);
         osc.frequency.setValueAtTime(150 * detune, t);
         osc.frequency.exponentialRampToValueAtTime(10, t + 0.2);
@@ -216,7 +213,7 @@ class SoundManager {
         gain.gain.setValueAtTime(0.3, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
 
-        osc.connect(gain); gain.connect(this.masterGain);
+        osc.connect(gain); gain.connect(this.sfxOut());
         osc.start(); osc.stop(t + 0.2);
     }
     playClassicBlade() {
@@ -231,7 +228,7 @@ class SoundManager {
         gain.gain.setValueAtTime(0.05, t); // Low volume (constant loop-like)
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
 
-        osc.connect(gain); gain.connect(this.masterGain);
+        osc.connect(gain); gain.connect(this.sfxOut());
         osc.start(); osc.stop(t + 0.15);
     }
     playClassicRailgun() {
@@ -245,7 +242,7 @@ class SoundManager {
         gain.gain.setValueAtTime(0.15, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.sfxOut());
         osc.start(t);
         osc.stop(t + 0.2);
     }
@@ -264,7 +261,7 @@ class SoundManager {
         gain.gain.setValueAtTime(0.3, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
 
-        noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
+        noise.connect(filter); filter.connect(gain); gain.connect(this.sfxOut());
         noise.start();
     }
     playClassicThunder() {
@@ -280,7 +277,7 @@ class SoundManager {
         gain.gain.setValueAtTime(0.15, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
 
-        osc.connect(gain); gain.connect(this.masterGain);
+        osc.connect(gain); gain.connect(this.sfxOut());
         osc.start(); osc.stop(t + 0.3);
 
         const noise = this.ctx.createBufferSource();
@@ -297,7 +294,7 @@ class SoundManager {
 
         noise.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
-        noiseGain.connect(this.masterGain);
+        noiseGain.connect(this.sfxOut());
         noise.start();
     }
     playClassicExplosion() {
@@ -306,21 +303,26 @@ class SoundManager {
         const noise = this.ctx.createBufferSource();
         noise.buffer = this.createNoiseBuffer(0.4);
         const filter = this.ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.type = 'lowpass';
-        
+                
         const detune = 1.0 + (Math.random() * 0.2 - 0.1);
         filter.frequency.setValueAtTime(500 * detune, t);
         filter.frequency.linearRampToValueAtTime(10, t + 0.3);
         const gain = this.ctx.createGain();
         gain.gain.setValueAtTime(0.5, t);
         gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
-        noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
+        noise.connect(filter); filter.connect(gain); gain.connect(this.sfxOut());
         noise.start();
     }
     playWeapon(key, options = {}, phase = 'fire') {
         const evolved = options.evolved ?? (typeof runBuild === 'object' && !!runBuild.evolved[key]);
         if (!evolved) {
+            // 旧SFXは毎回ノードを生成するため、同じ音の連打を間引く。
+            const now = this.soundTime();
+            if (now != null) {
+                const id = 'classic' + key + phase;
+                if (now - (this.sfxLast.get(id) ?? -Infinity) < .03) return;
+                this.sfxLast.set(id, now);
+            }
             const classic = { gun: 'Shoot', scatter: 'Shotgun', blade: 'Blade', laser: 'Railgun', whip: 'Whip', thunder: 'Thunder' }[key];
             if (classic) this['playClassic' + classic]();
             else if ((key === 'bomb' || key === 'mine') && phase === 'impact') this.playClassicExplosion();
@@ -466,6 +468,17 @@ class SoundManager {
             gain.gain.setValueAtTime(0.03, time);
             gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
 
+            noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
+            noise.start(time);
+        } else if (this.currentWave >= 15 && beat % 4 === 2) {
+            // Wave 15 以降は裏拍のハイハットで進行感を足す。
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.createNoiseBuffer(0.05);
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'highpass'; filter.frequency.value = 7000;
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.025, time);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
             noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain);
             noise.start(time);
         }
